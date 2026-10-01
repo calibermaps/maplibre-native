@@ -241,12 +241,8 @@ public:
     /// Moves the camera's centre onto the terrain under it without moving the camera: the centre
     /// slides along the line of sight up to the ground and the zoom tightens by the distance saved,
     /// so nothing on screen shifts. Rotating and pitching then turn around the ground being
-    /// looked at, not a sea-level point behind it. Inert without terrain.
-    ///
-    /// NOT safe to call once and keep zooming: the transform stores the centre altitude in
-    /// pixels at the current zoom, so after a zoom change the same value means a different
-    /// height (zoom out 5 levels and 1 km becomes 32 km) and the view swings away. Wiring it to
-    /// gesture starts did exactly that. Needs the altitude kept in metres first.
+    /// looked at, not a sea-level point behind it. Inert while the style has no terrain, so a
+    /// gesture handler can call it unconditionally.
     void anchorCenterOnTerrain();
 
     /// Debug: when enabled, RenderTerrain logs the camera eye's clearance over the terrain

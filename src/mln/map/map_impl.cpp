@@ -324,7 +324,8 @@ void Map::Impl::onDidFinishRenderingMap() {
 };
 
 void Map::Impl::anchorCenterOnTerrain() {
-    if (std::isnan(terrainCenterElevation)) {
+    // The last reported height outlives a removed terrain; the style says whether there is one.
+    if (!style->impl->getTerrain() || std::isnan(terrainCenterElevation)) {
         return;
     }
     const TransformState& state = transform.getState();
