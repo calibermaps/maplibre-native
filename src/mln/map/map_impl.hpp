@@ -144,6 +144,12 @@ public:
     /// Runs a return still waiting before the app sets a camera, which every camera entry point
     /// does first, so that the return does not move the app's camera afterwards.
     void settleCenterAwaitingSeaLevel();
+    /// A height report arrived while a camera transition was running; the clamp applies it
+    /// once the transition ends instead of cutting the transition short.
+    bool centerAwaitingTerrainAnchor = false;
+    /// Moves the centre altitude to `elevationMeters` keeping lng/lat; false when the change
+    /// is under the sub-metre threshold.
+    bool clampCenterToTerrain(double elevationMeters);
     bool debugAboveGroundLog = false;
 };
 
