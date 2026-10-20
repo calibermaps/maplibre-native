@@ -72,17 +72,23 @@ struct TerrainLoadBudget {
     /// it costs terrain render *distance*, which is why Quality keeps a generous cap rather
     /// than the aggressive one Performance uses.
     size_t maxMeshTiles;
+    /// Zoom levels the terrain mesh may go past the DEM source's maxzoom, so draped content
+    /// stays sharp in a close-up. Each level quarters a mesh tile's ground area, so it
+    /// multiplies the tiles a view needs by four, each with its own drape target. Quality
+    /// takes three for the sharpest close-ups; Balanced and Performance take one to keep the
+    /// drape textures' memory bounded on a phone.
+    uint8_t overzoomLevels;
 };
 
 constexpr TerrainLoadBudget terrainLoadBudget(TerrainLoadMode mode) {
     switch (mode) {
         case TerrainLoadMode::Balanced:
-            return {32, 16, 48};
+            return {32, 16, 48, 1};
         case TerrainLoadMode::Performance:
-            return {8, 4, 24};
+            return {8, 4, 24, 1};
         case TerrainLoadMode::Quality:
         default:
-            return {0, 0, 64}; // no per-frame budget, generous tile cap
+            return {0, 0, 64, 3}; // no per-frame budget, generous tile cap, deep close-ups
     }
 }
 

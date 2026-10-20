@@ -877,7 +877,12 @@ per-map API knob, not a style property: `Map::setTerrainLoadMode` /
 `TerrainLoadMode { Quality, Balanced, Performance }` (`include/mln/map/mode.hpp`,
 `terrainLoadBudget()` maps each mode to a budget pair). Default **Quality =
 unlimited** = the historical sharp snap-load, so nothing regresses; Balanced =
-32 tiles / 16 drapes per frame, Performance = 8 / 4. Exposed on Android
+32 tiles / 16 drapes per frame, Performance = 8 / 4. The mode also sets how far
+the mesh (and its drape targets) may go past the DEM's maxzoom,
+`TerrainLoadBudget::overzoomLevels`: Quality 3, Balanced and Performance 1. Each
+level quarters a tile's ground area, so it multiplies the tiles a view needs
+(each with its own drape target); in the iOS simulator, a 90 s pan over a z15 DEM
+peaked at 815-879 MB of drape textures on three levels and 178-187 MB on one. Exposed on Android
 (`MapLibreMap.setTerrainLoadMode`, `TerrainLoadMode` enum). All five "3D Terrain"
 test activities share a `TerrainTestOptions` overflow menu that toggles terrain,
 switches load mode, toggles the built-in rendering-stats HUD (FPS + frame

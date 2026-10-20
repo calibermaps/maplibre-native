@@ -152,10 +152,13 @@ std::set<UnwrappedTileID> RenderTerrain::computeMeshCover(
     // samples its closest DEM ancestor through the sub-tile offset (the per-tile lookup already
     // walks ancestors), and its 1024 px drape target then covers a smaller area. Capped at the
     // DEM maxzoom, a close-up at z16 over a z12 DEM stretched each target 8x (dotted roads,
-    // blocky fills); `terrainOverzoomLevels` more levels keep draped content near 1:1.
+    // blocky fills); `TerrainLoadBudget::overzoomLevels` more levels keep draped content near 1:1.
+    // Without update parameters the map is on the default mode, Quality.
+    const uint8_t overzoomLevels =
+        terrainLoadBudget(updateParameters ? updateParameters->terrainLoadMode : TerrainLoadMode::Quality)
+            .overzoomLevels;
     const Range<uint8_t> zoomRange{
-        0,
-        static_cast<uint8_t>(std::min<int>(demSource->getMaxZoom() + terrainOverzoomLevels, util::DEFAULT_MAX_ZOOM))};
+        0, static_cast<uint8_t>(std::min<int>(demSource->getMaxZoom() + overzoomLevels, util::DEFAULT_MAX_ZOOM))};
 
     // LOD parameters from the frame drive the same near-high/far-low zoom
     // selection every other source uses, so the near field drapes at a higher

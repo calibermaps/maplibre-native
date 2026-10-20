@@ -14,6 +14,7 @@
 #include <mln/util/image.hpp>
 #include <mln/util/run_loop.hpp>
 
+#include <algorithm>
 #include <cmath>
 
 using namespace mln;
@@ -180,6 +181,49 @@ TEST(TerrainLoadBudget, MeshTileCapGrowsWithTheViewport) {
     EXPECT_EQ(balanced * 2, terrainMeshTileCap(TerrainLoadMode::Balanced, 2 * 390.0 * 844.0));
     EXPECT_EQ(balanced * 4, terrainMeshTileCap(TerrainLoadMode::Balanced, 1032.0 * 1376.0));
     EXPECT_EQ(balanced * 4, terrainMeshTileCap(TerrainLoadMode::Balanced, 4000.0 * 4000.0));
+}
+
+// Past the DEM's maxzoom the mesh goes three levels deeper on Quality, one on the phone budgets.
+TEST(TerrainLoadBudget, OverzoomLevelsFollowTheLoadMode) {
+    EXPECT_EQ(3, terrainLoadBudget(TerrainLoadMode::Quality).overzoomLevels);
+    EXPECT_EQ(1, terrainLoadBudget(TerrainLoadMode::Balanced).overzoomLevels);
+    EXPECT_EQ(1, terrainLoadBudget(TerrainLoadMode::Performance).overzoomLevels);
+}
+
+// Every mesh tile has its own drape target, so for the same view the targets rendered in one
+// frame count the mesh cover's tiles. The harness DEM has maxzoom 2, so at zoom 5 Quality covers
+// the 256 x 256 view at z5 (maxzoom + 3, four tiles where the view straddles tile edges) and
+// Balanced and Performance at z3 (maxzoom + 1, a single tile). The counter only ever grows, so
+// each frame's share is the difference from the frame before; the most any frame rendered is
+// taken. 48 is Balanced's mesh-tile cap, the lowest of the two caps in play at this viewport
+// size: staying under it proves the cap is not what separates the modes.
+TEST(TerrainLoadBudget, OverzoomBoundsTheDrapeCover) {
+    const auto mostDrapeTargetsInAFrame = [](TerrainLoadMode mode) {
+        TerrainCameraTest test;
+        test.map.setTerrainLoadMode(mode);
+        test.map.jumpTo(CameraOptions().withCenter(LatLng{47.2692, 11.4041}).withZoom(5.0).withPitch(0.0));
+
+        int total = 0;
+        int most = 0;
+        int quietFrames = 0;
+        for (int i = 0; i < 12 && (most == 0 || quietFrames < 2); ++i) {
+            test.loop.runOnce();
+            const int rendered = test.frontend.render(test.map).stats.numDrapeTargetsRendered;
+            most = std::max(most, rendered - total);
+            quietFrames = (rendered == total) ? quietFrames + 1 : 0;
+            total = rendered;
+        }
+        return most;
+    };
+
+    const int quality = mostDrapeTargetsInAFrame(TerrainLoadMode::Quality);
+    const int balanced = mostDrapeTargetsInAFrame(TerrainLoadMode::Balanced);
+    const int performance = mostDrapeTargetsInAFrame(TerrainLoadMode::Performance);
+
+    EXPECT_GE(balanced, 1);
+    EXPECT_EQ(balanced, performance);
+    EXPECT_GT(quality, balanced);
+    EXPECT_LE(quality, 48);
 }
 
 // Near grazing, the line of sight runs almost along the ground: keeping the view would slide the

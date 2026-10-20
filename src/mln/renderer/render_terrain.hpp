@@ -188,10 +188,6 @@ public:
     /// the tile count shrinks by 4x per level, so this is a handful of tiles.
     static constexpr uint8_t demAncestorLevels = 8;
 
-    /// Zoom levels the terrain mesh (and its drape targets) may go past the DEM source's maxzoom,
-    /// sampling the DEM from an ancestor, so draped content stays sharp in close-ups.
-    static constexpr uint8_t terrainOverzoomLevels = 3;
-
     /**
      * @brief Per-tile elevation sampler for CPU-side symbol projection (line-placed labels):
      * tile-local point -> exaggerated metres, from the DEM tile covering `tileID` or its
