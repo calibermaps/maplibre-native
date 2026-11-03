@@ -142,13 +142,9 @@ public:
     void prepareSource(class RenderOrchestrator& orchestrator);
 
     /// Cache the mesh cover Renderer::Impl computed for this frame, so update()
-    /// meshes exactly the tile set the drape-target pool was built from.
-    /// computeMeshCover() is not stable within a frame: it derives its tile size
-    /// from `demDim`, which is 0 until the first DEM decodes and only then takes
-    /// the source's real value. For a 256px DEM the pre-pool call therefore falls
-    /// back to 512 and covers a different (shallower) tile set than the in-update
-    /// call, so every getRenderTarget() lookup missed and no terrain drawable was
-    /// ever created - the map rendered empty.
+    /// meshes exactly the tile set the drape-target pool was built from, and does
+    /// not compute it again. A set that differed from the pool's would miss every
+    /// getRenderTarget() lookup, create no terrain drawable and leave the map empty.
     void setFrameMeshCover(std::set<UnwrappedTileID> cover) { frameMeshCover = std::move(cover); }
 
     /**
