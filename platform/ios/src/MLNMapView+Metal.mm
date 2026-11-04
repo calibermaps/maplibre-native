@@ -41,7 +41,13 @@ public:
 
   void bind() override {
     if (!commandQueue) {
-      commandQueue = [mtlView.device newCommandQueue];
+      // The renderer backend's queue, not a queue of the view's own: offscreen passes (drape
+      // targets, hillshade prepare) commit to the backend's queue, and only command buffers on
+      // one queue are guaranteed to run in commit order with the hazard tracking that orders a
+      // target's writes before the frame's reads. On a separate queue the frame could sample a
+      // drape target mid-render (white flashes over terrain) unless every offscreen pass waited
+      // for the GPU to finish.
+      commandQueue = (__bridge id<MTLCommandQueue>)backend.getCommandQueue().get();
     }
 
     if (!commandBuffer) {
@@ -73,8 +79,15 @@ public:
     id<CAMetalDrawable> currentDrawable = [mtlView currentDrawable];
     if (currentDrawable) {
       if (presentsWithTransaction) {
+        // Presenting inside the Core Animation transaction keeps the map in step with UIKit
+        // annotation views. That needs the frame on the GPU's queue before present, not finished:
+        // waitUntilCompleted serialised every frame - the CPU idle while the GPU drew, the GPU idle
+        // while the CPU encoded the next - and with view annotations on (any at all, see
+        // MLNPresentsWithTransactionAnnotationCount) a pitched terrain map ran at ~15 fps with the
+        // GPU 27 % busy and the main thread ~30 % (iPhone 16 Pro). Apple's guidance for
+        // presentsWithTransaction is waitUntilScheduled, then present.
         [commandBuffer commit];
-        [commandBuffer waitUntilCompleted];
+        [commandBuffer waitUntilScheduled];
         [currentDrawable present];
       } else {
         [commandBuffer presentDrawable:currentDrawable];
