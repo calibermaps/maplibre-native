@@ -225,6 +225,17 @@ RenderTarget::DrapeCoverage RenderTarget::computeDrapeCoverage(RenderOrchestrato
                 bestAncestor = tile;
             }
         }
+        // The layer's style revision: an app animating a draped layer (a line-gradient
+        // reveal) changes its look without changing which tiles cover the target.
+        if ((haveExactOrDescendant || bestAncestor) && parameters.drapeLayerRevisions) {
+            if (const auto it = parameters.drapeLayerRevisions->find(layerGroup.getName());
+                it != parameters.drapeLayerRevisions->end()) {
+                std::size_t revisionHash = std::hash<std::string>{}(layerGroup.getName());
+                util::hash_combine(revisionHash, it->second);
+                coverage.contentHash += revisionHash;
+                coverage.revisionHash += revisionHash;
+            }
+        }
         // Only the coarsest standalone fallback counts as lost detail; when an exact or
         // deeper tile is present the ancestor is clipped away by the tile masks and costs
         // nothing.
@@ -379,7 +390,7 @@ RenderTarget::RenderResult RenderTarget::render(RenderOrchestrator& orchestrator
         // drawable set changing (contentHash) or crossing an integer zoom - is not
         // "worse" and falls through to re-render. The target's lifetime bounds
         // staleness: when its terrain tile leaves the cover it is destroyed.
-        if (coverage.worseThan(bakedCoverage)) {
+        if (coverage.revisionHash == bakedCoverage.revisionHash && coverage.worseThan(bakedCoverage)) {
             // Keeping the already-baked (better) content: record that at this
             // signature the decision was to hold, so future identical frames skip
             // the scan too. A real change (drawable set, zoom, properties) moves the
