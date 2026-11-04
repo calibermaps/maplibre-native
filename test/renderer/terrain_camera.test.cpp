@@ -3,15 +3,18 @@
 #include <mln/test/map_adapter.hpp>
 
 #include <mln/gfx/headless_frontend.hpp>
+#include <mln/gfx/backend_scope.hpp>
 #include <mln/map/bound_options.hpp>
 #include <mln/map/camera.hpp>
 #include <mln/map/map_options.hpp>
+#include <mln/map/mode.hpp>
 #include <mln/math/angles.hpp>
 #include <mln/style/style.hpp>
 #include <mln/style/terrain.hpp>
 #include <mln/util/constants.hpp>
 #include <mln/util/image.hpp>
 #include <mln/util/run_loop.hpp>
+#include <mln/util/timer.hpp>
 
 #include <algorithm>
 #include <chrono>
@@ -1188,4 +1191,51 @@ TEST(TerrainCamera, AFlightEasesTheCenterHeightToTheGroundItIsHeadedFor) {
     EXPECT_NEAR(camera.center->longitude(), target.longitude(), 1e-3);
     EXPECT_NEAR(*camera.zoom, 14.0, 0.05) << "at the zoom asked for";
     EXPECT_NEAR(*camera.centerAltitude, 0.0, 30.0) << "with the center on the ground there";
+}
+
+namespace {
+
+// Asks for a still of a fill over a large area under terrain in the given load mode and runs
+// the loop until the still completes, or ten seconds pass. Returns whether it completed.
+bool renderStillUnderTerrain(TerrainLoadMode mode) {
+    util::RunLoop loop;
+    auto fileSource = std::make_shared<StubFileSource>(ResourceOptions::Default(), ClientOptions());
+    const std::string tile = makeFlatDEMTile();
+    fileSource->tileResponse = [&](const Resource&) {
+        Response res;
+        res.data = std::make_shared<std::string>(tile);
+        return res;
+    };
+    HeadlessFrontend frontend{{390, 844}, 1};
+    MapAdapter map(frontend,
+                   MapObserver::nullObserver(),
+                   fileSource,
+                   MapOptions().withMapMode(MapMode::Static).withSize(frontend.getSize()));
+    map.getStyle().loadJSON(drapedFillStyle);
+    map.setTerrainLoadMode(mode);
+    map.setBounds(BoundOptions().withMaxPitch(85.0));
+    map.jumpTo(CameraOptions().withCenter(LatLng{47.2692, 11.4041}).withZoom(5.0).withPitch(80.0));
+    gfx::BackendScope guard{*frontend.getBackend()};
+    bool completed = false;
+    util::Timer limit;
+    limit.start(std::chrono::seconds(10), Duration::zero(), [&] { loop.stop(); });
+    map.renderStill([&](const std::exception_ptr& error) {
+        completed = !error;
+        loop.stop();
+    });
+    loop.run();
+    return completed;
+}
+
+} // namespace
+
+// In static mode the map draws only for a still it was asked for. A frame the load budget left
+// partial asks for a follow-up frame, but nothing in static mode took it up, so a still waited
+// for a full frame that never came: the map snapshotter never returned an image under terrain in
+// a budgeted mode. The unbudgeted mode, which leaves no frame partial, is the control.
+TEST(TerrainLoadBudget, AStillCompletesInABudgetedLoadMode) {
+    EXPECT_TRUE(renderStillUnderTerrain(TerrainLoadMode::Performance))
+        << "the still did not complete in the budgeted mode";
+    EXPECT_TRUE(renderStillUnderTerrain(TerrainLoadMode::Quality))
+        << "the still did not complete in the unbudgeted mode";
 }

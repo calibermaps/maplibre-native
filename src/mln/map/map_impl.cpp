@@ -331,9 +331,16 @@ void Map::Impl::onDidFinishRenderingFrame(RenderMode renderMode,
                 actionJournal->impl->onDidBecomeIdle();
             }
         }
-    } else if (stillImageRequest && rendererFullyLoaded) {
-        const auto request = std::move(stillImageRequest);
-        request->callback(nullptr);
+    } else if (stillImageRequest) {
+        if (rendererFullyLoaded) {
+            const auto request = std::move(stillImageRequest);
+            request->callback(nullptr);
+        } else if (needsRepaint) {
+            // A frame the terrain load budget left partial asks for a follow-up, and a still map
+            // draws only when asked: nothing else would ask, so the request would wait for a
+            // full frame that never comes.
+            onUpdate();
+        }
     }
 
     lastFrameStats = std::move(stats);
