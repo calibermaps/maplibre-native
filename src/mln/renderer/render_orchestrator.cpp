@@ -222,6 +222,7 @@ std::unique_ptr<RenderTree> RenderOrchestrator::createRenderTree(
     evaluationParameters.globalState = globalState;
     evaluationParameters.globalStateChanged = globalStateChanged;
     evaluationParameters.changedGlobalStateKeys = changedGlobalStateKeys;
+    evaluationParameters.pinnedCrossfade = updateParameters->terrain.has_value();
 
     TileParameters tileParameters{.pixelRatio = updateParameters->pixelRatio,
                                   .debugOptions = updateParameters->debugOptions,
