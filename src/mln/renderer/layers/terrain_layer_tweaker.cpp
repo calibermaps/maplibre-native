@@ -19,6 +19,18 @@ namespace mln {
 
 using namespace shaders;
 
+namespace {
+
+// Ground metres across one tile unit (1/8192 of the tile) at the tile's centre latitude. The
+// shader divides DEM height differences by it to find how steep the ground is.
+float metersPerTileUnit(const OverscaledTileID& id) {
+    const double n = std::pow(2.0, id.canonical.z);
+    const double lat = std::atan(std::sinh(M_PI * (1.0 - 2.0 * (id.canonical.y + 0.5) / n)));
+    return static_cast<float>(util::M2PI * util::EARTH_RADIUS_M * std::cos(lat) / (n * util::EXTENT));
+}
+
+} // namespace
+
 void TerrainLayerTweaker::execute(LayerGroupBase& layerGroup, const PaintParameters& parameters) {
     if (layerGroup.empty() || !terrain) {
         return;
@@ -92,7 +104,8 @@ void TerrainLayerTweaker::execute(LayerGroupBase& layerGroup, const PaintParamet
         const TerrainDrawableUBO drawableUBO = {
 #endif
             .matrix = util::cast<float>(matrix),
-            .dem_coords = terrain->getDrawableDemCoords(*drawable.getTileID())
+            .dem_coords = terrain->getDrawableDemCoords(*drawable.getTileID()),
+            .slope_params = {{metersPerTileUnit(*drawable.getTileID()), 0.0f, 0.0f, 0.0f}}
         };
 
 #if !MLN_UBO_CONSOLIDATION
