@@ -34,6 +34,7 @@ layout(push_constant) uniform Constants {
 struct TerrainDrawableUBO {
     mat4 matrix;
     vec4 dem_coords;
+    vec4 slope_params;
 };
 
 layout(std140, set = LAYER_SET_INDEX, binding = idTerrainDrawableUBO) readonly buffer TerrainDrawableUBOVector {

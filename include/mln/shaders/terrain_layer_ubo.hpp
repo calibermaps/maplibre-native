@@ -9,9 +9,11 @@ struct alignas(16) TerrainDrawableUBO {
     /*  0 */ std::array<float, 4 * 4> matrix;
     /* 64 */ std::array<float, 4> dem_coords; // scale, x offset, y offset into the bound DEM
                                               // tile ({1,0,0,0} unless an ancestor is bound)
-    /* 80 */
+    /* 80 */ std::array<float, 4> slope_params; // x = metres per tile unit (rock shading of steep
+                                                // ground); yzw reserved
+    /* 96 */
 };
-static_assert(sizeof(TerrainDrawableUBO) == 5 * 16);
+static_assert(sizeof(TerrainDrawableUBO) == 6 * 16);
 
 // One entry per instance of the instanced GL terrain depth pass. The whole array is bound as
 // the TerrainDrawableUBO block and indexed by gl_InstanceID in terrain_depth.vertex. Kept
