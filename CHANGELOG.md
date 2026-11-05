@@ -31,6 +31,7 @@
 - Bump [googletest](https://github.com/google/googletest.git) from 1.10.0 to 1.12.1
 - Bump [zip-archive](https://github.com/ZipArchive/ZipArchive.git) from 2.2.3 to 2.5.2
 - Bump [cpp-httplib](https://github.com/yhirose/cpp-httplib) from [this commit](https://github.com/yhirose/cpp-httplib/commit/b557ac9328f3571edbb8efa25905b950f6654e9d) (~0.5.1) to 0.11.1
+- [core] With 3D terrain, `TerrainLoadMode::Balanced` now meshes the terrain as deep as the view asks, as Quality does, instead of stopping at zoom 15 (the 48 mesh tile cap still applies), so a close-up shows a finer mesh and sharper draped content and uses more graphics memory. In every mode only the nearest tiles (up to 24) drape at the full 1024 px size and the rest at 512 px, and a drape texture that cannot be allocated is retried at the smaller size.
 
 ### 🐞 Bug fixes
 

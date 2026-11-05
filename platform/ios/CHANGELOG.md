@@ -4,6 +4,7 @@ MapLibre welcomes participation and contributions from everyone. Please read [`M
 
 ## main
 
+- With 3D terrain on, only the nearest tiles (up to 24) drape at the full 1024 px size; the rest drape at 512 px, which saves graphics memory in tilted views.
 - Add `MLNSource.isVolatile`: a source whose tiles are never written to the ambient cache on disk, as `Source.setVolatile()` on Android ([#4843](https://github.com/maplibre/maplibre-native/issues/4843)).
 - Make symbol guard checks opt-in, so symbol-dense tiles load faster. To keep them, set the environment variable `MLN_SYMBOL_GUARDS=1` before the first map loads.
 - With 3D terrain on, the map draped on the terrain no longer keeps showing old content after a data change: an `MLNShapeSource` given a new shape or emptied of its features, or a new style whose raster source has the same tiling, now shows at once instead of at the next zoom level ([#4816](https://github.com/maplibre/maplibre-native/pull/4816)).
