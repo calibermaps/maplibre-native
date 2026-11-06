@@ -81,10 +81,21 @@ const std::string occlusionStyle = R"STYLE({
   "terrain": {"source": "dem", "exaggeration": 1.0},
   "layers": [
     {"id": "background", "type": "background", "paint": {"background-color": "white"}},
-    {"id": "icons", "type": "symbol", "source": "icons",
-     "layout": {"icon-image": "dot", "icon-allow-overlap": true, "icon-ignore-placement": true}}
+    ICONS_LAYER
   ]
 })STYLE";
+
+const std::string iconLayer = R"({"id": "icons", "type": "symbol", "source": "icons",
+     "layout": {"icon-image": "dot", "icon-allow-overlap": true, "icon-ignore-placement": true}})";
+// The same two points drawn as red circles; a circle must be hidden behind terrain just as a symbol is
+const std::string circleLayer = R"({"id": "icons", "type": "circle", "source": "icons",
+     "paint": {"circle-color": "#ff0000", "circle-radius": 6, "circle-opacity": 1}})";
+
+// ... and as a heatmap: a kernel behind the ridge must not add to the density that is drawn
+const std::string heatmapLayer = R"JSON({"id": "icons", "type": "heatmap", "source": "icons",
+     "paint": {"heatmap-radius": 12, "heatmap-intensity": 8, "heatmap-opacity": 1,
+               "heatmap-color": ["interpolate", ["linear"], ["heatmap-density"],
+                                 0, "rgba(255,0,0,0)", 0.3, "rgb(255,0,0)", 1, "rgb(255,0,0)"]}})JSON";
 
 // Whether any pixel within `radius` of `point` is the icons' red
 bool redNear(const PremultipliedImage& image, const ScreenCoordinate& point, int radius) {
@@ -104,9 +115,8 @@ bool redNear(const PremultipliedImage& image, const ScreenCoordinate& point, int
     return false;
 }
 
-} // namespace
-
-TEST(TerrainOcclusion, AnIconBehindARidgeIsHidden) {
+// Renders the scene with `layer` drawing the two points and checks the near one is drawn and the far one hidden
+void expectOnlyTheNearPointIsDrawn(const std::string& layer) {
     util::RunLoop loop;
     auto fileSource = std::make_shared<StubFileSource>(ResourceOptions::Default(), ClientOptions());
     fileSource->tileResponse = [](const Resource& resource) {
@@ -123,6 +133,7 @@ TEST(TerrainOcclusion, AnIconBehindARidgeIsHidden) {
                    MapOptions().withMapMode(MapMode::Static).withSize(frontend.getSize()));
 
     std::string style = occlusionStyle;
+    style.replace(style.find("ICONS_LAYER"), std::string("ICONS_LAYER").size(), layer);
     style.replace(style.find("BEHIND_LAT"), std::string("BEHIND_LAT").size(), std::to_string(behindLat));
     map.getStyle().loadJSON(style);
     PremultipliedImage dot({12, 12});
@@ -132,7 +143,7 @@ TEST(TerrainOcclusion, AnIconBehindARidgeIsHidden) {
         dot.data[i * 4 + 2] = 0;
         dot.data[i * 4 + 3] = 255;
     }
-    map.getStyle().addImage(std::make_unique<style::Image>("dot", std::move(dot), 1.0f));
+    map.getStyle().addImage(std::make_unique<style::Image>("dot", std::move(dot), 1.0f)); // used by the symbol layer only
     map.jumpTo(
         CameraOptions().withCenter(LatLng{centreLat, centreLon}).withZoom(12.0).withPitch(60.0).withBearing(0.0));
 
@@ -148,6 +159,20 @@ TEST(TerrainOcclusion, AnIconBehindARidgeIsHidden) {
     ASSERT_GT(front.y - behind.y, 20.0); // the far icon sits higher up the screen, inside it
     ASSERT_GT(behind.y, 10.0);
 
-    EXPECT_TRUE(redNear(image, front, 4)) << "the icon in front of the ridge is drawn";
-    EXPECT_FALSE(redNear(image, behind, 4)) << "the icon behind the ridge is hidden";
+    EXPECT_TRUE(redNear(image, front, 4)) << "the point in front of the ridge is drawn";
+    EXPECT_FALSE(redNear(image, behind, 4)) << "the point behind the ridge is hidden";
+}
+
+} // namespace
+
+TEST(TerrainOcclusion, AnIconBehindARidgeIsHidden) {
+    expectOnlyTheNearPointIsDrawn(iconLayer);
+}
+
+TEST(TerrainOcclusion, ACircleBehindARidgeIsHidden) {
+    expectOnlyTheNearPointIsDrawn(circleLayer);
+}
+
+TEST(TerrainOcclusion, AHeatmapBehindARidgeIsHidden) {
+    expectOnlyTheNearPointIsDrawn(heatmapLayer);
 }
