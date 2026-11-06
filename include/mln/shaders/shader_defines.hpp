@@ -388,6 +388,7 @@ enum {
     idTerrainDEMTexture,
     idTerrainMapTexture,
     idTerrainDEMArrayTexture, // sampler2DArray of packed DEM tiles for the instanced GL depth pass
+    idTerrainDEMFromTexture,  // the DEM the surface is blended away from (see TerrainEvaluatedPropsUBO::dem_blend)
     terrainTextureCount
 };
 

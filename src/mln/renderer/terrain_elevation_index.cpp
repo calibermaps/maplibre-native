@@ -26,8 +26,11 @@ TerrainElevationIndex::Grid::Grid(const DEMData& dem)
     }
 }
 
-TerrainElevationIndex::TerrainElevationIndex(std::vector<Tile> tiles_, float exaggeration_)
+TerrainElevationIndex::TerrainElevationIndex(std::vector<Tile> tiles_,
+                                             float exaggeration_,
+                                             std::shared_ptr<const TerrainElevationIndex> held_)
     : tiles(std::move(tiles_)),
+      held(std::move(held_)),
       exaggeration(exaggeration_) {
     for (const auto& tile : tiles) {
         const uint8_t z = tile.id.canonical.z;
@@ -42,9 +45,24 @@ TerrainElevationIndex::TerrainElevationIndex(std::vector<Tile> tiles_, float exa
         maxElevation = std::max(maxElevation, static_cast<double>(tile.grid->maxHeight) * exaggeration);
     }
     std::sort(levels.begin(), levels.end(), [](const Level& a, const Level& b) { return a.z > b.z; });
+    if (held) {
+        maxElevation = std::max(maxElevation, held->getMaxElevation());
+    }
 }
 
 std::optional<double> TerrainElevationIndex::getElevation(const LatLng& latLng) const {
+    const auto own = getOwnElevation(latLng);
+    if (!held) {
+        return own;
+    }
+    const auto old = held->getElevation(latLng);
+    if (!own || !old) {
+        return own ? own : old;
+    }
+    return std::max(*own, *old);
+}
+
+std::optional<double> TerrainElevationIndex::getOwnElevation(const LatLng& latLng) const {
     for (const auto& level : levels) {
         // The integer-zoom overload projects into tile units (world size 2^z), not pixels.
         const Point<double> world = Projection::project(latLng, level.z);

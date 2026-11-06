@@ -109,6 +109,12 @@ struct RenderingStats {
     /// Number of CPU-side texture objects made for terrain DEM tiles (numCreatedTextures counts GPU
     /// allocations, which these are not); a still terrain scene should leave it unchanged
     int numDEMTexturesCreated = 0;
+    /// The terrain surface's blend from the DEMs it was drawn with to the ones it is drawn with now
+    /// (RenderTerrain::surfaceBlend), as of the last frame: 1 at rest, 0 while a switch of source
+    /// holds the old surface. Not a counter
+    float terrainSurfaceBlend = 1.0f;
+    /// Mesh tiles drawn with the old DEM mixed into the new one in the last frame. Not a counter
+    int numTerrainTilesBlending = 0;
     /// Terrain depth passes (the symbol-occlusion depth texture) rendered; one per frame in
     /// which the camera or the mesh set changed, none for a still frame
     int numDepthPasses = 0;

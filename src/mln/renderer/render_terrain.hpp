@@ -9,6 +9,7 @@
 #include <mln/gfx/vertex_buffer.hpp>
 #include <mln/gfx/index_buffer.hpp>
 #include <mln/renderer/terrain_cache_policy.hpp>
+#include <mln/renderer/terrain_surface_fade.hpp>
 #include <mln/renderer/texture_pool.hpp>
 #include <mln/renderer/terrain_elevation_index.hpp>
 #include <mln/util/mat4.hpp>
@@ -349,6 +350,18 @@ public:
                    : std::array<float, 4>{{1.0f / util::EXTENT, 0.0f, 0.0f, static_cast<float>(demDim)}};
     }
 
+    /// The tile's mapping into the DEM its drawable blends away from (scale, x offset, y offset,
+    /// dim), the current one when it blends from nothing
+    std::array<float, 4> getDrawableDemCoordsFrom(const OverscaledTileID& tileID) const {
+        const auto it = drawableDemCoordsFrom.find(tileID);
+        return it != drawableDemCoordsFrom.end() ? it->second : getDrawableDemCoords(tileID);
+    }
+    /// What the surface blends away from: its unpack vector, exaggeration and DEM dimension (the
+    /// current ones at rest)
+    const std::array<float, 4>& getFromUnpackVector() const { return fromUnpack; }
+    float getFromExaggeration() const { return fromExaggeration; }
+    float getFromDemDim() const { return static_cast<float>(fromDemDim); }
+
     /**
      * @brief Per-tile DEM binding data for layers that sample elevation in their
      * vertex shaders (the native analog of maplibre-gl-js terrain.getTerrainData)
@@ -377,6 +390,34 @@ public:
      * @brief Get the terrain implementation
      */
     const Immutable<style::Terrain::Impl>& getImpl() const { return impl; }
+
+    /**
+     * @brief Continue the surface of the terrain this one replaces (a new source, or a new
+     * exaggeration): its height samples and the DEM textures it drew stay until the new source
+     * has loaded under every visible mesh tile (or SurfaceFade::holdTimeout passes), then the
+     * whole surface blends into the new one with one fade (SurfaceFade). Until the fade ends the
+     * camera's ground is the higher of the old and new heights. Called once, right after
+     * construction, with the terrain being dropped.
+     */
+    void inheritSurface(const RenderTerrain& previous, TimePoint now);
+
+    /// Whether the surface is holding the old DEMs or blending to new ones, or has a finer DEM
+    /// waiting for the blend in progress to end: another frame is wanted.
+    bool surfaceTransitionPending() const { return fade.active() || refinementsDeferred; }
+
+    /// 0 while the old surface is held, 1 at rest, in between while blending. The same value for
+    /// every mesh tile.
+    float surfaceBlend() const { return fade.blend(); }
+
+    /// Mesh tiles that draw the old DEM mixed into the new one right now (0 at rest)
+    size_t tilesBlending() const { return fade.active() ? tilesWithDrawables.size() : 0; }
+
+    /// The ground heights the camera must clear: the loaded DEM, and during a switch of source
+    /// the old surface's too. Null while neither has a height.
+    const std::shared_ptr<const TerrainElevationIndex>& getHeldElevationIndex() const {
+        static const std::shared_ptr<const TerrainElevationIndex> none;
+        return held ? held->index : none;
+    }
 
     /**
      * @brief Get the terrain mesh for a specific tile
@@ -583,6 +624,31 @@ private:
     void updateInstancedDepthUBO(PaintParameters&);
 #endif
 
+    // The one fade of the whole surface (see SurfaceFade). Holding: the surface of the terrain this
+    // one replaced, drawn until the new source has loaded. Fading: every drawable mixes its old DEM
+    // into its new one by the same blend; a finer DEM that loads meanwhile waits for the next fade.
+    terrain::SurfaceFade fade;
+    bool refinementsDeferred = false;
+    // The unpack vector, exaggeration and DEM dimension of the DEMs drawables blend away from.
+    // The current ones except in a switch of source or exaggeration.
+    std::array<float, 4> fromUnpack = {{6553.6f, 25.6f, 0.1f, 10000.0f}};
+    float fromExaggeration = 1.0f;
+    int32_t fromDemDim = 0;
+    // Per-drawable scale/offset into the DEM the drawable blends away from; read by the tweaker
+    std::map<OverscaledTileID, std::array<float, 4>> drawableDemCoordsFrom;
+    // What a switch of source keeps of the terrain it replaced until the fade ends: the DEM textures
+    // its drawables were drawing, and its height samples. Nothing of it outlives the fade.
+    struct HeldSurface {
+        std::map<UnwrappedTileID, std::shared_ptr<gfx::Texture2D>> textures;
+        int32_t dim = 0;
+        std::shared_ptr<const TerrainElevationIndex> index;
+    };
+    std::optional<HeldSurface> held;
+    /// The held DEM covering `tile` (its own, else the closest ancestor's), or the flat placeholder
+    terrain::SurfaceDEM heldDEMFor(gfx::Context&, const UnwrappedTileID& tile);
+    /// Ends the fade: drawables stop blending and the old DEMs are let go
+    void finishSurfaceFade(gfx::Context&);
+
     // See getPlaceholderDEMTexture
     std::shared_ptr<gfx::Texture2D> placeholderDEMTexture;
 
@@ -610,7 +676,8 @@ private:
                                                          const OverscaledTileID& tileID,
                                                          std::shared_ptr<gfx::Texture2D> demTexture,
                                                          std::shared_ptr<gfx::Texture2D> mapTexture,
-                                                         bool depthPass = false);
+                                                         bool depthPass = false,
+                                                         std::shared_ptr<gfx::Texture2D> demFromTexture = nullptr);
 };
 
 } // namespace mln

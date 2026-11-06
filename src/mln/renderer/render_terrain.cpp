@@ -488,6 +488,8 @@ void RenderTerrain::update(RenderOrchestrator& orchestrator,
                            const RenderTree& /*renderTree*/,
                            UniqueChangeRequestVec& changes) {
     prepareSource(orchestrator);
+    const TimePoint now = updateParameters ? updateParameters->timePoint : Clock::now();
+    refinementsDeferred = false;
 
     // Create layer group if we don't have one (including after rebuild)
     if (!layerGroup) {
@@ -537,8 +539,9 @@ void RenderTerrain::update(RenderOrchestrator& orchestrator,
     }
 
     // Get tiles from the DEM source
+    // (A switch of source draws the old surface until the new one has tiles, so it goes on.)
     auto renderTiles = demSource->getRawRenderTiles();
-    if (renderTiles->empty()) {
+    if (renderTiles->empty() && !held) {
         return;
     }
 
@@ -579,7 +582,9 @@ void RenderTerrain::update(RenderOrchestrator& orchestrator,
     // This frame's DEM data by tile, for packing a tile into the GL array once a mesh tile binds it
     std::unordered_map<UnwrappedTileID, const DEMData*> frameDEMData;
 #endif
+    size_t loadedDEMCount = 0;
     for (const auto& loaded : loadedDEMTiles(demSource)) {
+        ++loadedDEMCount;
         const DEMData* demData = loaded.data;
 #if MLN_RENDER_BACKEND_OPENGL
         frameDEMData.emplace(loaded.id, demData);
@@ -674,6 +679,11 @@ void RenderTerrain::update(RenderOrchestrator& orchestrator,
         }
     }
 
+    // Whether a finer DEM replaced the one a tile draws while nothing else was blending: the
+    // surface fades from this frame, and the tiles remade now are not the only ones to blend
+    bool startingFade = false;
+    std::unordered_set<OverscaledTileID> waveTiles;
+
     // Create terrain drawables for each mesh tile
     for (const auto& unwrapped : meshTiles) {
         const OverscaledTileID tileID(unwrapped.canonical.z, unwrapped.wrap, unwrapped.canonical);
@@ -757,9 +767,41 @@ void RenderTerrain::update(RenderOrchestrator& orchestrator,
         terrain::DEMBinding binding{
             .tier = demTier,
             .demZoom = static_cast<int8_t>(demTileUsed ? static_cast<int>(demTileUsed->canonical.z) : -1)};
+        binding.to = {demTexture, demCoords};
+        // The DEM the new drawable blends away from. At rest nothing: the blend is 1 and the shader
+        // reads only the bound DEM.
+        terrain::SurfaceDEM from;
         if (const auto existing = tilesWithDrawables.find(tileID); existing != tilesWithDrawables.end()) {
-            if (!drapeReplaced && !terrain::shouldRebind(existing->second, binding)) {
+            const bool better = terrain::shouldRebind(existing->second, binding);
+            if (!drapeReplaced && !better) {
                 continue;
+            }
+            from = existing->second.from;
+            // A tile still on the flat placeholder has no surface to blend away from: it takes its first
+            // DEM at once, whatever the others are doing
+            const bool fromFlat = existing->second.tier == 0 && !held;
+            if (better && fromFlat) {
+                from = fade.phase() == terrain::SurfaceFade::Phase::Fading ? binding.to : terrain::SurfaceDEM{};
+            } else if (better && fade.phase() == terrain::SurfaceFade::Phase::Fading) {
+                // The surface is blending: a finer DEM changing a tile now would give it a blend of
+                // its own, and the tile beside it a different one at the edge they share. It waits
+                // for the blend to end, and for the next fade with every other tile that has one.
+                refinementsDeferred = true;
+                if (!drapeReplaced) {
+                    continue;
+                }
+                // The drape texture changed: remake the drawable, on the DEMs it has
+                binding.tier = existing->second.tier;
+                binding.demZoom = existing->second.demZoom;
+                binding.to = existing->second.to;
+                demTexture = binding.to.texture;
+                demCoords = binding.to.coords;
+            } else if (better && fade.phase() == terrain::SurfaceFade::Phase::Idle) {
+                // A finer DEM replaces the one the tile draws: it blends in, with every other tile
+                // that has a finer DEM this frame (the one fade started below)
+                from = existing->second.to;
+                startingFade = true;
+                waveTiles.insert(tileID);
             }
             lg->removeDrawablesIf(
                 [&](gfx::Drawable& drawable) { return drawable.getTileID() && *drawable.getTileID() == tileID; });
@@ -771,8 +813,15 @@ void RenderTerrain::update(RenderOrchestrator& orchestrator,
                 depthDirty = true;
             }
             tilesWithDrawables.erase(existing);
+        } else if (held) {
+            // A tile that appears during a switch of source blends from the old surface like the rest
+            from = heldDEMFor(context, unwrapped);
+        } else if (fade.phase() == terrain::SurfaceFade::Phase::Fading) {
+            from = binding.to;
         }
+        binding.from = from;
         drawableDemCoords[tileID] = demCoords;
+        drawableDemCoordsFrom[tileID] = from.texture ? from.coords : demCoords;
 #if MLN_RENDER_BACKEND_OPENGL
         {
             float layer = -1.0f;
@@ -799,7 +848,8 @@ void RenderTerrain::update(RenderOrchestrator& orchestrator,
         if (!renderTarget) {
             continue;
         }
-        auto drawable = createDrawableForTile(context, shaders, tileID, demTexture, renderTarget->getTexture());
+        auto drawable = createDrawableForTile(
+            context, shaders, tileID, demTexture, renderTarget->getTexture(), false, from.texture);
         if (drawable) {
             lg->addDrawable(std::move(drawable));
             binding.drapeTexture = renderTarget->getTexture();
@@ -816,6 +866,44 @@ void RenderTerrain::update(RenderOrchestrator& orchestrator,
 #endif
         }
     }
+
+    // The surface's blend. A fade that starts this frame starts from the DEMs every tile draws now:
+    // the tiles that got a finer one were remade blending from their old DEM, the rest blend from
+    // the DEM they have (no change).
+    if (startingFade) {
+        for (auto& [id, built] : tilesWithDrawables) {
+            if (!waveTiles.contains(id)) {
+                built.from = built.to;
+                drawableDemCoordsFrom[id] = built.to.coords;
+            }
+        }
+        lg->visitDrawables([&](gfx::Drawable& drawable) {
+            if (const auto id = drawable.getTileID(); id && !waveTiles.contains(*id)) {
+                if (const auto built = tilesWithDrawables.find(*id); built != tilesWithDrawables.end()) {
+                    drawable.setTexture(built->second.to.texture, shaders::idTerrainDEMFromTexture);
+                }
+            }
+        });
+        fromUnpack = demUnpackVector;
+        fromExaggeration = getExaggeration();
+        fromDemDim = demDim;
+        fade.fade(now);
+    } else if (fade.active()) {
+        // A switch of source holds the old surface until the new source has loaded under every
+        // visible tile, or the timeout. Its tiles are loaded when the source has some and is waiting
+        // for none (a tile that errored counts: nothing more is coming for it).
+        const bool ready = loadedDEMCount > 0 && demSource->isLoaded();
+        fade.advance(now, ready);
+        if (!fade.active()) {
+            finishSurfaceFade(context);
+        }
+    } else if (!held) {
+        fromUnpack = demUnpackVector;
+        fromExaggeration = getExaggeration();
+        fromDemDim = demDim;
+    }
+    context.renderingStats().terrainSurfaceBlend = fade.blend();
+    context.renderingStats().numTerrainTilesBlending = static_cast<int>(tilesBlending());
 
     // Debug-only, off by default: gate the whole above-ground check (per-frame free-camera +
     // elevation sampling) on the flag so it costs nothing unless explicitly enabled.
@@ -856,6 +944,71 @@ void RenderTerrain::update(RenderOrchestrator& orchestrator,
         }
     }
 #endif
+}
+
+void RenderTerrain::inheritSurface(const RenderTerrain& previous, TimePoint now) {
+    // What the old terrain drew: the textures its drawables were bound to, with the tile each is of
+    HeldSurface kept;
+    std::unordered_set<const gfx::Texture2D*> drawn;
+    for (const auto& [id, built] : previous.tilesWithDrawables) {
+        if (built.to.texture) {
+            drawn.insert(built.to.texture.get());
+        }
+    }
+    for (const auto& [id, entry] : previous.demTextures) {
+        if (entry.texture && drawn.contains(entry.texture.get())) {
+            kept.textures.emplace(id, entry.texture);
+        }
+    }
+    if (kept.textures.empty()) {
+        // The old terrain drew no DEM (nothing had loaded): nothing to hold, the new one starts as usual
+        return;
+    }
+    kept.dim = previous.demDim;
+    kept.index = previous.elevationIndex;
+    held = std::move(kept);
+    fromUnpack = previous.demUnpackVector;
+    fromExaggeration = previous.getExaggeration();
+    fromDemDim = previous.demDim;
+    fade.hold(now);
+}
+
+terrain::SurfaceDEM RenderTerrain::heldDEMFor(gfx::Context& context, const UnwrappedTileID& tile) {
+    if (held) {
+        // The held DEM of the tile itself, else of its closest ancestor
+        const UnwrappedTileID* best = nullptr;
+        for (const auto& [id, texture] : held->textures) {
+            if ((id == tile || tile.isChildOf(id)) && (!best || id.canonical.z > best->canonical.z)) {
+                best = &id;
+            }
+        }
+        if (best) {
+            const auto mapping = demTileMapping(tile.canonical, best->canonical);
+            return {held->textures.at(*best), {{mapping[0], mapping[1], mapping[2], static_cast<float>(held->dim)}}};
+        }
+    }
+    // Nothing of the old surface covers the tile: it blends up from flat ground, as a tile always
+    // came up from the placeholder
+    return {getPlaceholderDEMTexture(context),
+            {{1.0f / util::EXTENT, 0.0f, 0.0f, static_cast<float>(held ? held->dim : demDim)}}};
+}
+
+void RenderTerrain::finishSurfaceFade(gfx::Context& context) {
+    fade.finish();
+    held.reset();
+    fromUnpack = demUnpackVector;
+    fromExaggeration = getExaggeration();
+    fromDemDim = demDim;
+    drawableDemCoordsFrom.clear();
+    for (auto& [id, built] : tilesWithDrawables) {
+        built.from = {};
+    }
+    // The old DEMs are let go: the drawables go back to the placeholder in the slot they were read from
+    if (auto* lg = static_cast<LayerGroup*>(layerGroup.get())) {
+        lg->visitDrawables([&](gfx::Drawable& drawable) {
+            drawable.setTexture(getPlaceholderDEMTexture(context), shaders::idTerrainDEMFromTexture);
+        });
+    }
 }
 
 void RenderTerrain::logAboveGroundMargin(const TransformState& state) {
@@ -1036,8 +1189,10 @@ bool RenderTerrain::updateElevationIndex() {
     }
     const auto loaded = loadedDEMTiles(demSource);
     const float exaggeration = getExaggeration();
+    // The old surface's heights, while a switch of source holds or fades it (see inheritSurface)
+    const std::shared_ptr<const TerrainElevationIndex> oldHeights = held ? held->index : nullptr;
     bool changed = !elevationIndex || elevationIndex->getExaggeration() != exaggeration ||
-                   loaded.size() != elevationGrids.size();
+                   elevationIndex->getHeld() != oldHeights || loaded.size() != elevationGrids.size();
     if (!changed) {
         for (const auto& tile : loaded) {
             const auto found = elevationGrids.find(tile.id);
@@ -1065,14 +1220,14 @@ bool RenderTerrain::updateElevationIndex() {
         grids.emplace(tile.id, std::move(copy));
     }
     elevationGrids = std::move(grids);
-    if (tiles.empty()) {
+    if (tiles.empty() && !oldHeights) {
         // Terrain on with no DEM loaded yet: nothing to hand over, and nothing changed if the
         // map already has none
         const bool hadIndex = elevationIndex != nullptr;
         elevationIndex.reset();
         return hadIndex;
     }
-    elevationIndex = std::make_shared<const TerrainElevationIndex>(std::move(tiles), exaggeration);
+    elevationIndex = std::make_shared<const TerrainElevationIndex>(std::move(tiles), exaggeration, oldHeights);
     return true;
 }
 
@@ -1103,18 +1258,26 @@ std::optional<double> RenderTerrain::getElevationForLatLng(const LatLng& latLng,
         bestX = tx * util::EXTENT;
         bestY = ty * util::EXTENT;
     }
+    // During a switch of source the camera must clear the old surface as well, which stays drawn
+    // until the new one has loaded and blended in: the higher of the two, and the old one alone
+    // where the new source has no tile yet
+    std::optional<double> oldHeight;
+    if (held && held->index) {
+        oldHeight = held->index->getElevation(latLng);
+    }
     if (!best) {
-        return std::nullopt;
+        return oldHeight;
     }
     if (from) {
         *from = best->id;
     }
     // Sample the tile just found; getElevation would search the DEM tiles for it again
-    return static_cast<double>(sampleDEM(*best->data,
-                                         {.scale = 1.0f, .dx = 0.0f, .dy = 0.0f},
-                                         static_cast<float>(bestX),
-                                         static_cast<float>(bestY)) *
-                               getExaggeration());
+    const double height = static_cast<double>(sampleDEM(*best->data,
+                                                        {.scale = 1.0f, .dx = 0.0f, .dy = 0.0f},
+                                                        static_cast<float>(bestX),
+                                                        static_cast<float>(bestY)) *
+                                              getExaggeration());
+    return oldHeight ? std::max(height, *oldHeight) : height;
 }
 
 std::optional<RenderTerrain::TerrainData> RenderTerrain::getTerrainData(const UnwrappedTileID& tileID) const {
@@ -1419,7 +1582,8 @@ std::unique_ptr<gfx::Drawable> RenderTerrain::createDrawableForTile(gfx::Context
                                                                     const OverscaledTileID& tileID,
                                                                     std::shared_ptr<gfx::Texture2D> demTexture,
                                                                     std::shared_ptr<gfx::Texture2D> mapTexture,
-                                                                    bool depthPass) {
+                                                                    bool depthPass,
+                                                                    std::shared_ptr<gfx::Texture2D> demFromTexture) {
     // Ensure mesh is generated
     const auto& terrainMesh = getMesh(context);
 
@@ -1509,6 +1673,9 @@ std::unique_ptr<gfx::Drawable> RenderTerrain::createDrawableForTile(gfx::Context
         } else {
             Log::Warning(Event::Render, "No drape texture for terrain tile " + util::toString(tileID));
         }
+        // The DEM the surface blends away from; a 1x1 placeholder at rest, so the sampler is bound
+        builder->setTexture(demFromTexture ? std::move(demFromTexture) : getPlaceholderDEMTexture(context),
+                            shaders::idTerrainDEMFromTexture);
     }
 
     // Flush to create the drawable
@@ -1696,7 +1863,12 @@ void RenderTerrain::updateInstancedDepthUBO(PaintParameters& parameters) {
                                                         .haze_color = {0.0f, 0.0f, 0.0f, 0.0f},
                                                         .haze_ramp = {0.0f, 0.0f},
                                                         .pad3 = 0.0f,
-                                                        .pad4 = 0.0f};
+                                                        .pad4 = 0.0f,
+                                                        .unpack_from = getDEMUnpackVector(),
+                                                        .exaggeration_from = getExaggeration(),
+                                                        .dem_dim_from = 0.0f,
+                                                        .dem_blend = 1.0f, // the depth pass samples the bound DEM only
+                                                        .pad5 = 0.0f};
 
     depthLg->visitDrawables([&](gfx::Drawable& drawable) {
         auto& u = drawable.mutableUniformBuffers();

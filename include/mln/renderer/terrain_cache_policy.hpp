@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -14,6 +15,13 @@ class Texture2D;
 
 namespace terrain {
 
+/// A DEM texture and the mapping into it from a mesh tile's local coordinates, as the shader's
+/// dem_coords: {scale, x offset, y offset, DEM dim}.
+struct SurfaceDEM {
+    std::shared_ptr<gfx::Texture2D> texture{};
+    std::array<float, 4> coords{{0.0f, 0.0f, 0.0f, 0.0f}};
+};
+
 /// What a terrain mesh drawable was built on: the DEM it samples, and the drape texture it draws.
 struct DEMBinding {
     /// 0 = flat placeholder, 1 = closest loaded ancestor DEM, 2 = the tile's own DEM
@@ -23,6 +31,10 @@ struct DEMBinding {
     /// The drape texture the drawable was built with. Held, not just compared: a freed texture's
     /// address must never be taken for a new texture's.
     std::shared_ptr<gfx::Texture2D> drapeTexture{};
+    /// The DEM the drawable samples, and the one it blends away from while the surface fades (a
+    /// null texture: none). Held for the same reason as the drape texture.
+    SurfaceDEM to{};
+    SurfaceDEM from{};
 };
 
 /// Whether a terrain drawable built on `current` should be rebuilt now that `available` could be
