@@ -28,9 +28,17 @@ add_library(
     ${PROJECT_SOURCE_DIR}/test/renderer/color_relief.test.cpp
     ${PROJECT_SOURCE_DIR}/test/renderer/dem_elevation_provider.test.cpp
     ${PROJECT_SOURCE_DIR}/test/renderer/terrain_camera.test.cpp
+    ${PROJECT_SOURCE_DIR}/test/renderer/terrain_elevation_index.test.cpp
+    ${PROJECT_SOURCE_DIR}/test/renderer/terrain_cliff_shading.test.cpp
+    ${PROJECT_SOURCE_DIR}/test/renderer/terrain_drape_zoom_step.test.cpp
+    ${PROJECT_SOURCE_DIR}/test/renderer/terrain_horizon_haze.test.cpp
     ${PROJECT_SOURCE_DIR}/test/renderer/terrain_fill_pattern_drape.test.cpp
+    ${PROJECT_SOURCE_DIR}/test/renderer/terrain_pattern_crossfade.test.cpp
     ${PROJECT_SOURCE_DIR}/test/renderer/terrain_drape_resolution.test.cpp
+    ${PROJECT_SOURCE_DIR}/test/renderer/terrain_drape_zoom_out.test.cpp
+    ${PROJECT_SOURCE_DIR}/test/renderer/terrain_occlusion.test.cpp
     ${PROJECT_SOURCE_DIR}/test/renderer/terrain_elevation.test.cpp
+    ${PROJECT_SOURCE_DIR}/test/renderer/terrain_runtime_layer.test.cpp
     ${PROJECT_SOURCE_DIR}/test/renderer/shader_registry.test.cpp
     ${PROJECT_SOURCE_DIR}/test/renderer/layer_min_zoom_tiles.test.cpp
     ${PROJECT_SOURCE_DIR}/test/renderer/terrain_cache_policy.test.cpp
@@ -160,6 +168,7 @@ if(MLN_WITH_OPENGL)
         PRIVATE
             ${PROJECT_SOURCE_DIR}/test/api/custom_layer.test.cpp
             ${PROJECT_SOURCE_DIR}/test/gl/bucket.test.cpp
+            ${PROJECT_SOURCE_DIR}/test/gl/drape_target_pool.test.cpp
             ${PROJECT_SOURCE_DIR}/test/gl/enum.test.cpp
             ${PROJECT_SOURCE_DIR}/test/gl/context.test.cpp
             ${PROJECT_SOURCE_DIR}/test/gl/gl_functions.test.cpp

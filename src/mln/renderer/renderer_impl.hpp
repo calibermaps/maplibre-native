@@ -11,6 +11,7 @@
 
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <mln/tile/tile_id.hpp>
 
@@ -19,6 +20,7 @@ namespace mln {
 class RendererObserver;
 class RenderStaticData;
 class RenderTree;
+class TerrainElevationIndex;
 
 namespace gfx {
 class RendererBackend;
@@ -55,7 +57,9 @@ private:
     /// into it, see RenderTarget::render), and the terrain drawables hold the
     /// textures they sample. Rebuilding the pool per frame would reallocate every
     /// tile-sized target every frame - churning GPU memory and discarding the
-    /// baked content that suppresses drape flicker.
+    /// baked content that suppresses drape flicker. A tile's target is replaced only
+    /// when the tile needs the other of the two sizes (TexturePool::createRenderTargets), or
+    /// after it failed to allocate (TexturePool::renderTargetFailed).
     // Drape target resolution = base tile size x qualityFactor. maplibre-gl-js renders
     // its render-to-texture tiles at tileSize * qualityFactor (qualityFactor = 2, i.e.
     // 1024x1024) precisely so draped content - thin lines especially - is not pixelated
@@ -65,9 +69,13 @@ private:
     // 1) draped roads look aliased because the line AA band, sized to the screen's device
     // pixel ratio, falls sub-texel in the lower-resolution target. Lower drapeQualityFactor
     // back to 1 to save GPU memory on constrained devices (each step is 4x memory/target).
+    // Only the tiles nearest the camera get that full size (RenderTerrain::fullSizeDrapeTilesOf);
+    // every other tile's target is drapeTileSize, a quarter of the memory.
     static constexpr uint32_t drapeTileSize = 512;
     static constexpr uint32_t drapeQualityFactor = 2;
-    TexturePool texturePool{drapeTileSize * drapeQualityFactor};
+    TexturePool texturePool{drapeTileSize * drapeQualityFactor, drapeTileSize};
+    /// This frame's layer revisions (see PaintParameters::drapeLayerRevisions).
+    std::unordered_map<std::string, std::uintptr_t> layerIdentities;
 
     gfx::RendererBackend& backend;
 
@@ -106,10 +114,17 @@ private:
     // cover cannot spin forever.
     int terrainCoverRetryFrames = 4;
     /// Last terrain height reported under the map centre, so an unchanged surface does not
-    /// post an observer message every frame.
-    double lastReportedCenterElevation = 0.0;
+    /// post an observer message every frame. NaN until one is: ground at 0 m is a height too.
+    double lastReportedCenterElevation = std::numeric_limits<double>::quiet_NaN();
     double lastReportedEyeElevation = std::numeric_limits<double>::quiet_NaN();
+    /// The loaded DEM tile the eye's height was last read from: once the eye is outside it with no
+    /// loaded tile under it, that height is not the ground under the eye any more.
+    std::optional<UnwrappedTileID> eyeElevationTile;
     double lastReportedTargetElevation = std::numeric_limits<double>::quiet_NaN();
+
+    /// The terrain height copy last handed to the observer (null: none, or terrain off), so it
+    /// is sent once per change rather than once per frame.
+    std::shared_ptr<const TerrainElevationIndex> reportedElevationIndex;
 
     enum class RenderState {
         Never,

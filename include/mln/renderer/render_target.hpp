@@ -130,6 +130,10 @@ protected:
         /// ids: those are rebuilt with fresh ids every frame during fades/bucket updates, which
         /// churned the signature and re-rendered every drape each frame while panning.
         std::size_t contentHash = 0;
+        /// The part of contentHash that comes from the style revisions of the covering layers
+        /// (an app animating a draped layer). A change here is a genuine change of look, never
+        /// a transient drop-out, so it is exempt from the keep-the-better-bake rule.
+        std::size_t revisionHash = 0;
         /// Integer tile-zoom (draped UBOs carry zoom-derived values like line ratio);
         /// stored quantized so a pinch within one zoom level does not invalidate the
         /// cache. See computeDrapeCoverage.
@@ -173,6 +177,9 @@ protected:
     // fewer layers / coarser fallbacks than it already shows (anti-flicker);
     // see RenderTarget::render.
     DrapeCoverage bakedCoverage;
+    // Whether the last decision on this target was to keep its bake because content was still on its way
+    // (see RenderTarget::render). That decision is only good while it is.
+    bool holdingForContent = false;
     // Opt-in "render once" for immutable targets (hillshade prepare, whose DEM input is
     // baked into the prepare drawable once). When set, the target renders on its first
     // frame and is skipped after (the offscreen texture persists). NOT set for the terrain

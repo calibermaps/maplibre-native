@@ -80,6 +80,7 @@
 #import "MLNStyleLayerManager.h"
 #import "MLNStyleLayer_Private.h"
 #import "MLNStyle_Private.h"
+#import "MLNTerrain.h"
 #import "MLNUserLocationAnnotationView.h"
 #import "MLNUserLocationAnnotationView_Private.h"
 #import "MLNUserLocation_Private.h"
@@ -454,6 +455,24 @@ public:
 
 - (void)initDefaults;
 @end
+
+// The ordinals of MLNTerrainLoadMode and MLNTerrainSkirtLength are pinned to their mln::
+// counterparts (see MLNTypes.h); catch drift here rather than at runtime.
+static_assert(static_cast<uint8_t>(MLNTerrainLoadModeQuality) ==
+                  static_cast<uint8_t>(mln::TerrainLoadMode::Quality),
+              "MLNTerrainLoadModeQuality must mirror mln::TerrainLoadMode::Quality");
+static_assert(static_cast<uint8_t>(MLNTerrainLoadModeBalanced) ==
+                  static_cast<uint8_t>(mln::TerrainLoadMode::Balanced),
+              "MLNTerrainLoadModeBalanced must mirror mln::TerrainLoadMode::Balanced");
+static_assert(static_cast<uint8_t>(MLNTerrainLoadModePerformance) ==
+                  static_cast<uint8_t>(mln::TerrainLoadMode::Performance),
+              "MLNTerrainLoadModePerformance must mirror mln::TerrainLoadMode::Performance");
+static_assert(static_cast<uint8_t>(MLNTerrainSkirtLengthAuto) ==
+                  static_cast<uint8_t>(mln::TerrainSkirtLength::Auto),
+              "MLNTerrainSkirtLengthAuto must mirror mln::TerrainSkirtLength::Auto");
+static_assert(static_cast<uint8_t>(MLNTerrainSkirtLengthNone) ==
+                  static_cast<uint8_t>(mln::TerrainSkirtLength::None),
+              "MLNTerrainSkirtLengthNone must mirror mln::TerrainSkirtLength::None");
 
 @implementation MLNMapView {
   std::unique_ptr<mln::Map> _mbglMap;
@@ -2742,8 +2761,11 @@ public:
 
   CGPoint centerPoint = CGPointMake(CGRectGetMidX(self.bounds), CGRectGetMidY(self.bounds));
   CGPoint endCameraPoint = CGPointMake(centerPoint.x - endPoint.x, centerPoint.y - endPoint.y);
-  CLLocationCoordinate2D panCoordinate = [self convertPoint:endCameraPoint
-                                       toCoordinateFromView:pan.view];
+  // A camera centre, so on the centre's own plane: the terrain pick would put it on the ground
+  // in front of it
+  CLLocationCoordinate2D panCoordinate =
+      MLNLocationCoordinate2DFromLatLng([self convertPoint:endCameraPoint
+                            toCenterAltitudeLatLngFromView:pan.view]);
 
   panCamera.centerCoordinate = panCoordinate;
 
@@ -3237,6 +3259,57 @@ static void *windowScreenContext = &windowScreenContext;
   return _mbglMap->getTileLodZoomShift();
 }
 
+// MARK: Terrain
+
+- (void)setTerrainWithSourceIdentifier:(nullable NSString *)sourceIdentifier
+                          exaggeration:(CGFloat)exaggeration {
+  if (!self.style) {
+    MLNLogWarning(@"Ignoring attempt to set terrain before the style has finished loading.");
+    return;
+  }
+
+  if (!sourceIdentifier) {
+    self.style.terrain = nil;
+    return;
+  }
+
+  self.style.terrain = [[MLNTerrain alloc] initWithSourceIdentifier:sourceIdentifier
+                                                       exaggeration:exaggeration];
+}
+
+- (void)setTerrainLoadMode:(MLNTerrainLoadMode)terrainLoadMode {
+  _mbglMap->setTerrainLoadMode(static_cast<mln::TerrainLoadMode>(terrainLoadMode));
+}
+
+- (MLNTerrainLoadMode)terrainLoadMode {
+  return static_cast<MLNTerrainLoadMode>(_mbglMap->getTerrainLoadMode());
+}
+
+- (void)setTerrainSkirtLength:(MLNTerrainSkirtLength)terrainSkirtLength {
+  _mbglMap->setTerrainSkirtLength(static_cast<mln::TerrainSkirtLength>(terrainSkirtLength));
+}
+
+- (MLNTerrainSkirtLength)terrainSkirtLength {
+  return static_cast<MLNTerrainSkirtLength>(_mbglMap->getTerrainSkirtLength());
+}
+
+- (void)setTerrainHazeColor:(nullable UIColor *)terrainHazeColor {
+  _mbglMap->setTerrainHaze((terrainHazeColor ?: UIColor.clearColor).mgl_color,
+                           _mbglMap->getTerrainHazeRange());
+}
+
+- (UIColor *)terrainHazeColor {
+  return [UIColor mgl_colorWithColor:_mbglMap->getTerrainHazeColor()];
+}
+
+- (void)setTerrainHazeRange:(CGFloat)terrainHazeRange {
+  _mbglMap->setTerrainHaze(_mbglMap->getTerrainHazeColor(), static_cast<float>(terrainHazeRange));
+}
+
+- (CGFloat)terrainHazeRange {
+  return _mbglMap->getTerrainHazeRange();
+}
+
 - (void)setFrustumOffset:(UIEdgeInsets)frustumOffset {
   _mbglMap->setFrustumOffset(MLNEdgeInsetsFromNSEdgeInsets(frustumOffset));
 }
@@ -3251,6 +3324,15 @@ static void *windowScreenContext = &windowScreenContext;
 
 - (BOOL)isCenterClampedToGround {
   return _mbglMap->getCenterClampedToGround();
+}
+
+- (nullable NSNumber *)terrainElevationForCoordinate:(CLLocationCoordinate2D)coordinate {
+  if (!CLLocationCoordinate2DIsValid(coordinate)) {
+    return nil;
+  }
+  std::optional<double> elevation =
+      _mbglMap->getTerrainElevation(MLNLatLngFromLocationCoordinate2D(coordinate));
+  return elevation ? @(*elevation) : nil;
 }
 
 // MARK: - Accessibility -
@@ -4614,7 +4696,21 @@ static void *windowScreenContext = &windowScreenContext;
 /// Converts a point in the view’s coordinate system to a geographic coordinate.
 - (mln::LatLng)convertPoint:(CGPoint)point toLatLngFromView:(nullable UIView *)view {
   CGPoint convertedPoint = [self convertPoint:point fromView:view];
-  return self.mbglMap.latLngForPixel(mln::ScreenCoordinate(convertedPoint.x, convertedPoint.y))
+  // With 3D terrain, the pixel's view ray meets the draped surface before sea level, so the
+  // sea-level unprojection would land well past the spot under the finger. Inverse of
+  // convertLatLng:toPointToView:; sea level without terrain.
+  return self.mbglMap
+      .latLngForPixelOnTerrain(mln::ScreenCoordinate(convertedPoint.x, convertedPoint.y))
+      .wrapped();
+}
+
+/// Converts a point in the view’s coordinate system to the geographic coordinate on the plane the
+/// camera’s centre sits on, for code that turns a point into a camera centre. With 3D terrain,
+/// convertPoint:toLatLngFromView: answers on the surface in front of that plane instead.
+- (mln::LatLng)convertPoint:(CGPoint)point toCenterAltitudeLatLngFromView:(nullable UIView *)view {
+  CGPoint convertedPoint = [self convertPoint:point fromView:view];
+  return self.mbglMap
+      .latLngForPixelAtCenterAltitude(mln::ScreenCoordinate(convertedPoint.x, convertedPoint.y))
       .wrapped();
 }
 
@@ -4628,7 +4724,9 @@ static void *windowScreenContext = &windowScreenContext;
 
 /// Converts a geographic coordinate to a point in the view’s coordinate system.
 - (CGPoint)convertLatLng:(mln::LatLng)latLng toPointToView:(nullable UIView *)view {
-  mln::ScreenCoordinate pixel = self.mbglMap.pixelForLatLng(latLng);
+  // With 3D terrain, project onto the draped surface so annotation views, the user location
+  // view and callouts sit on the ground they mark instead of at sea level.
+  mln::ScreenCoordinate pixel = self.mbglMap.pixelForLatLngOnTerrain(latLng);
   return [self convertPoint:CGPointMake(pixel.x, pixel.y) toView:view];
 }
 
@@ -4649,7 +4747,7 @@ static void *windowScreenContext = &windowScreenContext;
   auto southeast = bounds.southeast();
 
   auto center = [self convertPoint:{CGRectGetMidX(view.bounds), CGRectGetMidY(view.bounds)}
-                  toLatLngFromView:view];
+      toCenterAltitudeLatLngFromView:view];
 
   // Extend bounds to account for the antimeridian
   northwest.unwrapForShortestPath(center);
@@ -5696,7 +5794,10 @@ static void *windowScreenContext = &windowScreenContext;
 
   if (moveIntoView) {
     CGPoint center = CGPointMake(CGRectGetMidX(constrainedRect), CGRectGetMidY(constrainedRect));
-    CLLocationCoordinate2D centerCoord = [self convertPoint:center toCoordinateFromView:self];
+    // The new camera centre, on the centre's own plane (see cameraByPanningWithTranslation:)
+    CLLocationCoordinate2D centerCoord =
+        MLNLocationCoordinate2DFromLatLng([self convertPoint:center
+                              toCenterAltitudeLatLngFromView:self]);
     [self setCenterCoordinate:centerCoord
                     zoomLevel:self.zoomLevel
                     direction:self.direction

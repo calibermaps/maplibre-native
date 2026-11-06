@@ -121,6 +121,11 @@ public:
     /// Returns true if layer writes to depth buffer by drawing using PaintParameters::depthModeFor3D().
     virtual bool is3D() const { return false; }
 
+    /// Returns true if the layer's cross-fades are to be evaluated as over already: with terrain on, for a
+    /// layer drawn into a terrain drape. The fill-extrusion is the only layer type that is 3D, and the one
+    /// drawn into the main pass instead, so is3D() stands for "not drawn into the terrain overlay" here.
+    bool settlesCrossfade(bool terrainEnabled) const;
+
     /// Returns true is the layer is subject to placement.
     bool needsPlacement() const;
 
@@ -161,6 +166,9 @@ public:
     Immutable<style::LayerProperties> evaluatedProperties;
     /// Private implementation
     Immutable<style::Layer::Impl> baseImpl;
+    /// Bumped each time the layer's style object is replaced (the app changed its paint or
+    /// layout). An address would not do: the new object often lands where the old one was freed.
+    std::uint64_t styleRevision = 0;
 
     virtual void markContextDestroyed();
 

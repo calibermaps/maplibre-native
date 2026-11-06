@@ -190,6 +190,8 @@ void Map::Impl::onUpdate() {
                                .tileLodMode = tileLodMode,
                                .terrainLoadMode = terrainLoadMode,
                                .terrainSkirtLength = terrainSkirtLength,
+                               .terrainHazeColor = terrainHazeColor,
+                               .terrainHazeRange = terrainHazeRange,
                                .debugAboveGroundLog = debugAboveGroundLog,
                                .transitionTargetCenter = centerClampedToGround && !transitionIsFling
                                                              ? transform.getTransitionTargetCenter()
@@ -474,6 +476,10 @@ void Map::Impl::settleCenterAwaitingSeaLevel() {
         transform.cancelTransitions();
         returnCenterToSeaLevel();
     }
+}
+
+void Map::Impl::onTerrainElevationIndexChanged(std::shared_ptr<const TerrainElevationIndex> index) {
+    terrainElevationIndex = std::move(index);
 }
 
 double Map::Impl::eyeClearCenterAltitude() const {

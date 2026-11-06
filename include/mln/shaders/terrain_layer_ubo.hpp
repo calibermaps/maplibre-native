@@ -9,9 +9,11 @@ struct alignas(16) TerrainDrawableUBO {
     /*  0 */ std::array<float, 4 * 4> matrix;
     /* 64 */ std::array<float, 4> dem_coords; // scale, x offset, y offset into the bound DEM
                                               // tile ({1,0,0,0} unless an ancestor is bound)
-    /* 80 */
+    /* 80 */ std::array<float, 4> slope_params; // x = metres per tile unit (rock shading of steep
+                                                // ground); yzw reserved
+    /* 96 */
 };
-static_assert(sizeof(TerrainDrawableUBO) == 5 * 16);
+static_assert(sizeof(TerrainDrawableUBO) == 6 * 16);
 
 // One entry per instance of the instanced GL terrain depth pass. The whole array is bound as
 // the TerrainDrawableUBO block and indexed by gl_InstanceID in terrain_depth.vertex. Kept
@@ -43,9 +45,13 @@ struct alignas(16) TerrainEvaluatedPropsUBO {
     /* 20 */ float elevation_offset;
     /* 24 */ float pad1;
     /* 28 */ float pad2;
-    /* 32 */
+    /* 32 */ std::array<float, 4> haze_color; // distance haze, premultiplied; clear when there is none
+    /* 48 */ std::array<float, 2> haze_ramp;  // haze = clamp(x - y / view depth, 0, 1)^2 (TerrainLayerTweaker)
+    /* 56 */ float pad3;
+    /* 60 */ float pad4;
+    /* 64 */
 };
-static_assert(sizeof(TerrainEvaluatedPropsUBO) == 32);
+static_assert(sizeof(TerrainEvaluatedPropsUBO) == 64);
 
 } // namespace shaders
 } // namespace mln

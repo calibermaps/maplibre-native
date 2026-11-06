@@ -532,6 +532,69 @@ MLN_EXPORT
  */
 @property (nonatomic, assign) double tileLodZoomShift;
 
+// MARK: Terrain
+
+/**
+ Enables or disables 3D terrain on the style, draping the map over the elevation data
+ of a raster-dem source.
+
+ This is a convenience method that sets ``MLNStyle/terrain`` on ``style``. If the style
+ has not yet finished loading, this method does nothing and logs a warning; wait for
+ ``MLNMapViewDelegate/mapView:didFinishLoadingStyle:`` first.
+
+ @param sourceIdentifier The identifier of a raster-dem source that exists in the style.
+    Pass `nil` to remove terrain from the style.
+ @param exaggeration The vertical exaggeration multiplier to apply to the elevation
+    data. A value of `1.0` renders true-scale elevation.
+ */
+- (void)setTerrainWithSourceIdentifier:(nullable NSString *)sourceIdentifier
+                          exaggeration:(CGFloat)exaggeration
+    NS_SWIFT_NAME(setTerrain(sourceIdentifier:exaggeration:));
+
+/**
+ Selects the 3D-terrain progressive-loading budget.
+
+ This is a rendering/performance option, not a style property, so it does not affect
+ the final rendered image, only how the loading work of draped tiles and drape
+ re-renders is spread across frames. It trades initial-load sharpness for smoother
+ interaction on weaker GPUs. The default is ``MLNTerrainLoadModeQuality``. Has no effect
+ when terrain is not enabled.
+ */
+@property (nonatomic, assign) MLNTerrainLoadMode terrainLoadMode;
+
+/**
+ Selects whether 3D-terrain tiles are skirted.
+
+ Skirts hide the hairline gaps (stitches) between neighbouring terrain tiles at
+ different zoom levels. ``MLNTerrainSkirtLengthNone`` suits a map drawn over a
+ transparent background, where the skirts would otherwise show as vertical artifacts.
+ The default is ``MLNTerrainSkirtLengthAuto``. Changing this property rebuilds the
+ terrain mesh and every tile drawable. Has no effect when terrain is not enabled.
+ */
+@property (nonatomic, assign) MLNTerrainSkirtLength terrainSkirtLength;
+
+/**
+ The color far 3D terrain fades toward: distance haze that blends the far edge of the terrain
+ into whatever is drawn behind the map, such as a sky the app paints under a transparent map
+ view.
+
+ The color's alpha is the most the ground is blended toward it. The haze shows only while
+ ``terrainHazeRange`` is above `1`. The default is `UIColor.clearColor`, no haze. Has no effect
+ when terrain is not enabled.
+ */
+@property (nonatomic, copy, null_resettable) UIColor *terrainHazeColor;
+
+/**
+ How far the distance haze reaches, in multiples of the map center's distance from the camera.
+
+ Ground that far away and beyond takes the full ``terrainHazeColor``; nearer ground fades toward
+ it as in maplibre-gl-js's terrain fog with a `fog-ground-blend` of `0.5`, so with `3` the haze
+ begins at one and a half times the center's distance. As in maplibre-gl-js, the haze fades in
+ between pitches of 60 and 70 degrees. A value of `1` or less turns the haze off, and one above
+ `1000` is held at `1000`; the default is `0`. Has no effect when terrain is not enabled.
+ */
+@property (nonatomic, assign) CGFloat terrainHazeRange;
+
 /**
  Frustum offset used to disable rendering of elements at the edge of the screen
 
@@ -554,6 +617,20 @@ MLN_EXPORT
  This property is experimental and subject to change.
  */
 @property (nonatomic, assign, getter=isCenterClampedToGround) BOOL centerClampedToGround;
+
+/**
+ The rendered 3D terrain's height under a coordinate, in metres with the style's
+ exaggeration applied, as the renderer last loaded it.
+
+ Returns `nil` when terrain is not enabled or the DEM under the coordinate has not
+ loaded yet. The same query positions annotation views and the user location on
+ the draped surface; a caller that needs true elevation divides by the terrain's
+ exaggeration.
+
+ @param coordinate The geographic coordinate to sample.
+ */
+- (nullable NSNumber *)terrainElevationForCoordinate:(CLLocationCoordinate2D)coordinate
+    NS_SWIFT_NAME(terrainElevation(at:));
 
 // MARK: Displaying the User’s Location
 
@@ -1749,6 +1826,11 @@ of north, the map will automatically snap to exact north.
  Converts a point in the given view’s coordinate system to a geographic
  coordinate.
 
+ With 3D terrain, the coordinate is where the point’s line of sight first meets the
+ terrain surface (the nearest surface, so a ridge in front wins), rather than the point
+ at sea level behind it. Without terrain, or where no terrain data has loaded yet, it is
+ the sea-level point.
+
  @param point The point to convert.
  @param view The view in whose coordinate system the point is expressed.
  @return The geographic coordinate at the given point.
@@ -1761,6 +1843,10 @@ of north, the map will automatically snap to exact north.
 /**
  Converts a geographic coordinate to a point in the given view’s coordinate
  system.
+
+ With 3D terrain, the point is where the coordinate appears on the terrain surface, at
+ its terrain height, rather than at sea level. Without terrain, or where no terrain data
+ has loaded yet, it is the sea-level point.
 
  @param coordinate The geographic coordinate to convert.
  @param view The view in whose coordinate system the returned point should be

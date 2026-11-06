@@ -4,12 +4,16 @@
 #include <mln/style/terrain_impl.hpp>
 #include <mln/util/immutable.hpp>
 #include <mln/tile/tile_id.hpp>
+#include <mln/util/color.hpp>
 #include <mln/util/constants.hpp>
 #include <mln/gfx/vertex_buffer.hpp>
 #include <mln/gfx/index_buffer.hpp>
 #include <mln/renderer/terrain_cache_policy.hpp>
 #include <mln/renderer/texture_pool.hpp>
+#include <mln/renderer/terrain_elevation_index.hpp>
 #include <mln/util/mat4.hpp>
+#include <mln/util/geo.hpp>
+#include <mln/util/geometry.hpp>
 
 #include <algorithm>
 #include <array>
@@ -18,6 +22,7 @@
 #include <set>
 #include <string>
 #include <optional>
+#include <functional>
 #include <vector>
 #include <cstdint>
 #include <unordered_map>
@@ -83,7 +88,7 @@ public:
 
     /// The deepest zoom of the terrain mesh over a DEM whose maxzoom is `demMaxZoom`: the load
     /// mode's TerrainLoadBudget::meshTargetZoom, never shallower than the DEM. A target of
-    /// util::DEFAULT_MAX_ZOOM (Quality) follows the view, as maplibre-gl-js's TerrainSourceCache
+    /// util::DEFAULT_MAX_ZOOM (Quality and Balanced) follows the view, as maplibre-gl-js's TerrainSourceCache
     /// does (to z22, clamping only the DEM lookup); a lower one goes at most
     /// maxMeshOverzoomLevels past the DEM. A mesh tile past the DEM samples its DEM ancestor
     /// through a sub-tile offset.
@@ -104,6 +109,45 @@ public:
     /// The point the mesh-tile cap measures distance from, in normalized web-mercator [0, 1]:
     /// the ground under the camera (the map centre when the map is not tilted).
     static std::array<double, 2> meshTileCapOrigin(const TransformState& state);
+
+    /// How many of the cover's finest tiles nearest the camera get a full-size drape target in a
+    /// view that keeps moving, and the most that have one at once in any view.
+    static constexpr size_t fullSizeDrapeNearest = 16;
+    static constexpr size_t fullSizeDrapeMax = 24;
+
+    /// The tiles of the cover that get a full-size drape target (1024 px, four times the memory of
+    /// the half-size one every other tile has): the `nearest` tiles of the cover's finest zoom
+    /// nearest `origin` (the ground under the camera, where it is magnified most), and then,
+    /// nearest first, those of `hadFullSize` (tiles that have one now, of any zoom) until
+    /// `fullSizeDrapeMax` are full size. A full-size target is therefore taken away only when
+    /// that many nearer tiles displace it: replacing a target re-bakes the tile, and a view that
+    /// pans over the rank boundary, or whose finest zoom changes as one tile appears or leaves,
+    /// would otherwise swap the same targets back and forth.
+    static std::set<UnwrappedTileID> fullSizeDrapeTilesOf(const std::set<UnwrappedTileID>& cover,
+                                                          const std::array<double, 2>& origin,
+                                                          const std::set<UnwrappedTileID>& hadFullSize,
+                                                          size_t nearest = fullSizeDrapeNearest);
+
+    /// What the drape pool is asked for in a frame.
+    struct DrapeSizes {
+        /// The tiles that get full-size targets (fullSizeDrapeTilesOf).
+        std::set<UnwrappedTileID> fullSizeTiles;
+        /// How many existing targets may change size (TexturePool::createRenderTargets); 0 = all.
+        size_t maxResizes = 0;
+    };
+
+    /// The sizes of the drape targets for a frame of a map in `mode`, given the tiles that have a
+    /// full-size target now and the load mode's cap on drape re-renders (`drapeCap`, <= 0 for none).
+    /// A map that keeps moving keeps its targets steady: the earlier sizes count, and the cap
+    /// paces the swaps, the rest following on the repaints it asks for. A still (a Static or Tile
+    /// map) has no earlier frame to keep steady and no later one to finish deferred swaps, even on
+    /// a renderer that drew other views before: it is decided from scratch, the nearest
+    /// `fullSizeDrapeMax` tiles of the finest zoom at once, and every swap is made in the frame.
+    static DrapeSizes drapeSizesFor(MapMode mode,
+                                    int drapeCap,
+                                    const std::set<UnwrappedTileID>& cover,
+                                    const std::array<double, 2>& origin,
+                                    const std::set<UnwrappedTileID>& hadFullSize);
 
     /// The cover with a one-ring dilation: every 8-neighbour of a tile, at that tile's zoom,
     /// except one that lies over, or under, a tile the cover already has (whatever its zoom).
@@ -142,13 +186,10 @@ public:
     void prepareSource(class RenderOrchestrator& orchestrator);
 
     /// Cache the mesh cover Renderer::Impl computed for this frame, so update()
-    /// meshes exactly the tile set the drape-target pool was built from.
-    /// computeMeshCover() is not stable within a frame: it derives its tile size
-    /// from `demDim`, which is 0 until the first DEM decodes and only then takes
-    /// the source's real value. For a 256px DEM the pre-pool call therefore falls
-    /// back to 512 and covers a different (shallower) tile set than the in-update
-    /// call, so every getRenderTarget() lookup missed and no terrain drawable was
-    /// ever created - the map rendered empty.
+    /// meshes exactly the tile set the drape-target pool was built from, and does
+    /// not compute it again. A set that differed from the pool's would miss the
+    /// getRenderTarget() lookup for each tile the pool lacks, and those tiles
+    /// would get no terrain drawable.
     void setFrameMeshCover(std::set<UnwrappedTileID> cover) { frameMeshCover = std::move(cover); }
 
     /**
@@ -206,23 +247,68 @@ public:
     float getElevationWithExaggeration(const UnwrappedTileID& tileID, float x, float y) const;
 
     /**
-     * @brief Exaggerated terrain height under a geographic position
-     *
-     * Samples at the depth of the finest DEM tile currently loaded. `getElevation` only
-     * matches a DEM tile that is the sample tile or an ancestor of it, so a fixed sample
-     * zoom silently reads 0 wherever the DEM is loaded deeper than that.
+     * @brief Exaggerated height (metres) of the rendered terrain surface at a geographic
+     * coordinate, sampled from the deepest loaded DEM tile that contains it: rendered tiles and
+     * the ancestors retained for elevation lookups alike, so a point outside the rendered cover
+     * still reads its height. Render-thread only.
      *
      * @param latLng the position to sample
-     * @return height in metres of the rendered surface, or 0 when no DEM covers it
+     * @param from if given, set to the loaded tile the height was read from
+     * @return nullopt when terrain is off or no loaded DEM tile covers the point yet
      */
-    double getElevationForLatLng(const LatLng& latLng) const;
-    /// As getElevationForLatLng, but empty where no loaded DEM tile covers the point (rather than 0).
-    std::optional<double> findElevationForLatLng(const LatLng& latLng) const;
+    std::optional<double> getElevationForLatLng(const LatLng& latLng, UnwrappedTileID* from = nullptr) const;
+
+    /**
+     * @brief Coordinate of the draped surface under a screen pixel (y-down view pixels, as
+     * rendered-feature queries use). The pixel's view ray is marched from just below the camera
+     * down to sea level, sampling the terrain height at each candidate plane, and the first
+     * crossing (the nearest surface, so a ridge in front wins) is bisected. Inverse of
+     * Map::pixelForLatLng(latLng, elevation). Samples the height copy (getElevationIndex), so it
+     * answers as Map::latLngForPixelOnTerrain does. nullopt without terrain or loaded heights,
+     * without a camera altitude, when the camera is inside the terrain, or when the ray never meets
+     * the surface.
+     */
+    std::optional<LatLng> pickLatLng(const TransformState& state, const ScreenCoordinate& pixel) const;
+
+    /**
+     * @brief Bring the map side's copy of the terrain heights (getElevationIndex) up to date.
+     * Cheap when nothing changed: it rebuilds only when the loaded DEM tiles or the exaggeration
+     * differ from the last call, copying just the tiles it has not copied before, and drops the
+     * copy while terrain is off. Render-thread only.
+     * @return true when getElevationIndex changed, so the map needs the new one
+     */
+    bool updateElevationIndex();
+
+    /// The map side's copy of the terrain heights, as of the last updateElevationIndex; null while
+    /// terrain is off or no DEM tile is loaded.
+    const std::shared_ptr<const TerrainElevationIndex>& getElevationIndex() const { return elevationIndex; }
+
+    /// Zoom levels of already-loaded DEM ancestors kept above the cover
+    /// (TileParameters::retainAncestorLevels). The cover follows the declared maxzoom (16 with
+    /// overzoom), while layers can draw from tiles as shallow as ~z9 (far-field distance LOD,
+    /// low-maxzoom sources), so reach eight levels up; none is requested for it.
+    static constexpr uint8_t demAncestorLevels = 8;
+
+    /**
+     * @brief Per-tile elevation sampler for CPU-side symbol projection (line-placed labels):
+     * tile-local point -> exaggerated metres, from the DEM tile covering `tileID` or its
+     * closest loaded ancestor, and for points past that DEM tile's edge from the neighbouring one
+     * (getElevation). Where neither has loaded (a tile shallower than the DEM cover), from the
+     * deepest loaded tile under each point, through the height copy. Valid for the current frame
+     * only. nullopt without DEM data.
+     */
+    std::optional<std::function<float(const Point<float>&)>> elevationSampler(const UnwrappedTileID& tileID) const;
 
     /**
      * @brief Get the terrain exaggeration multiplier
      */
     float getExaggeration() const;
+
+    /**
+     * @brief The map's distance haze (Map::setTerrainHaze) as of the last update; range 0 is none
+     */
+    const Color& getHazeColor() const { return hazeColor; }
+    float getHazeRange() const { return hazeRange; }
 
     /**
      * @brief Get the source ID providing DEM data
@@ -372,6 +458,9 @@ private:
     // The skirt setting the cached mesh was built with. update() drops the mesh and every
     // tile drawable built from it when the map's setting no longer matches.
     TerrainSkirtLength meshSkirtLength = TerrainSkirtLength::Auto;
+    // The map's distance haze, taken from each update for the tweaker.
+    Color hazeColor;
+    float hazeRange = 0.0f;
 
     // Layer group for terrain drawables
     LayerGroupBasePtr layerGroup;
@@ -397,7 +486,8 @@ private:
     // Mesh drawables by tile, with the DEM they were built on (tier: 0 = placeholder/flat,
     // 1 = ancestor fallback, 2 = own DEM, plus that DEM's zoom); a drawable is replaced
     // whenever terrain::shouldRebind says a better DEM can be bound - a higher tier, or a
-    // deeper ancestor within the fallback tier
+    // deeper ancestor within the fallback tier - or terrain::drapeTextureReplaced says the
+    // tile's drape target was replaced (it changed size) and so has a new texture
     std::unordered_map<OverscaledTileID, terrain::DEMBinding> tilesWithDrawables;
 
     // Per-drawable scale/offset into the bound DEM texture ({1,0,0,0} unless
@@ -451,6 +541,15 @@ private:
     // this, preventing unbounded growth while browsing (previously reached 2GB+)
     static constexpr size_t maxDEMTextures = 96;
     uint64_t demUpdateCounter = 0;
+
+    /// Per-tile height copies behind elevationIndex, kept across rebuilds so a new tile set
+    /// copies only its new tiles. `source` identifies the DEM the copy was taken from.
+    struct ElevationGridCopy {
+        const DEMData* source = nullptr;
+        std::shared_ptr<const TerrainElevationIndex::Grid> grid;
+    };
+    std::unordered_map<UnwrappedTileID, ElevationGridCopy> elevationGrids;
+    std::shared_ptr<const TerrainElevationIndex> elevationIndex;
 
 #if MLN_RENDER_BACKEND_OPENGL
     // OpenGL-only: the same DEM tiles packed into one GL_TEXTURE_2D_ARRAY so the

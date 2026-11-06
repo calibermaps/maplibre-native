@@ -65,6 +65,7 @@ public:
     void onWillStartRenderingMap() final;
     void onDidFinishRenderingMap() final;
     void onTerrainCenterElevationChanged(double elevationMeters) final;
+    void onTerrainElevationIndexChanged(std::shared_ptr<const TerrainElevationIndex>) final;
     void onTerrainEyeElevationChanged(double elevationMeters) final;
     void onTerrainTransitionTargetElevationChanged(double elevationMeters) final;
     void onStyleImageMissing(const std::string&, const std::function<void()>&) final;
@@ -123,6 +124,8 @@ public:
     TileLodMode tileLodMode = TileLodMode::Default;
     TerrainLoadMode terrainLoadMode = TerrainLoadMode::Quality;
     TerrainSkirtLength terrainSkirtLength = TerrainSkirtLength::Auto;
+    Color terrainHazeColor;
+    float terrainHazeRange = 0.0f;
     /// Off by default. Opt in with Map::setCenterClampedToGround. A gesture holds the center's
     /// height, and its end anchors the center on the ground keeping the view, the way GL JS's
     /// elevationFreeze and recalculateZoomAndCenter do.
@@ -198,6 +201,9 @@ public:
     /// Moves the centre altitude to `elevationMeters` keeping lng/lat; false when the change
     /// is under the sub-metre threshold.
     bool clampCenterToTerrain(double elevationMeters);
+    /// The renderer's terrain heights, copied for this side (onTerrainElevationIndexChanged); null
+    /// without terrain. Map's terrain projection reads it so it never waits on the renderer.
+    std::shared_ptr<const TerrainElevationIndex> terrainElevationIndex;
     bool debugAboveGroundLog = false;
 };
 

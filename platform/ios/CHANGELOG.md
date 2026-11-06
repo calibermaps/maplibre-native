@@ -4,12 +4,15 @@ MapLibre welcomes participation and contributions from everyone. Please read [`M
 
 ## main
 
+- With 3D terrain on, only the nearest tiles (up to 24) drape at the full 1024 px size; the rest drape at 512 px, which saves graphics memory in tilted views.
 - Add `MLNSource.isVolatile`: a source whose tiles are never written to the ambient cache on disk, as `Source.setVolatile()` on Android ([#4843](https://github.com/maplibre/maplibre-native/issues/4843)).
 - Make symbol guard checks opt-in, so symbol-dense tiles load faster. To keep them, set the environment variable `MLN_SYMBOL_GUARDS=1` before the first map loads.
 - With 3D terrain on, the map draped on the terrain no longer keeps showing old content after a data change: an `MLNShapeSource` given a new shape or emptied of its features, or a new style whose raster source has the same tiling, now shows at once instead of at the next zoom level ([#4816](https://github.com/maplibre/maplibre-native/pull/4816)).
 - With 3D terrain, pinch, rotate and two-finger tilt gestures turn around the ground under the middle of the screen instead of a sea-level point beneath it, and a pan over high ground no longer jumps the map along the view. Removing the terrain brings the centre back to sea level without moving the camera. After a gesture with terrain, camera changes the app makes keep the centre altitude the gesture set; set the altitude explicitly to place the centre elsewhere ([#4711](https://github.com/maplibre/maplibre-native/pull/4711)).
 - Add `MLNMapView.centerAltitude` and `-[MLNMapView setCenterAltitudeKeepingView:]`. With 3D terrain, a center coordinate and zoom level describe the same view only at the same center altitude, so save the altitude with a camera and restore it before setting the camera back ([#4712](https://github.com/maplibre/maplibre-native/pull/4712)).
 - With 3D terrain on and the centre clamp enabled, the clamp no longer cancels a running camera animation; the camera is anchored to the ground once the animation ends ([#4768](https://github.com/maplibre/maplibre-native/pull/4768)).
+- With 3D terrain, annotation views, the user location view, callouts, line-placed labels and the collision index sit on the terrain surface instead of at sea level, so labels show, hide and overlap where they are drawn and pins on slopes can be selected. `-convertCoordinate:toPointToView:` and `-convertPoint:toCoordinateFromView:` answer on the terrain surface, from a copy of the terrain heights kept on the map side ([#4558](https://github.com/maplibre/maplibre-native/pull/4558)).
+- Add `MLNRenderingStats.numDrapeTargetsDeferred`, `numNewTileBuildsDeferred` and `numTerrainCoverPendingFrames`, which count why frames asked for a follow-up frame: the terrain load mode's per-frame budget deferring a drape re-render or a new tile build, or an empty drape cover.
 
 ## 7.0.0
 
@@ -68,6 +71,7 @@ We welcome ideas for extending the plugin API.
 
 ### Bug fixes
 
+- `raster` and `raster-dem` sources loaded from a `url` take the style's inline `minzoom` and `maxzoom` over the TileJSON's, as `vector` sources and maplibre-gl-js already do. A `raster-dem` source with an invalid `encoding`, `minzoom` or `maxzoom`, or a `raster` source with an invalid `minzoom` or `maxzoom`, is now rejected with an error, as a `vector` source is. Before, such a `raster-dem` source still loaded, decoded as Mapbox whatever its `encoding` ([#4557](https://github.com/maplibre/maplibre-native/pull/4557)).
 - Size `line-pattern` images like MapLibre GL JS. They were drawn about 1.7× bigger and stretched along the line ([#4726](https://github.com/maplibre/maplibre-native/pull/4726)).
 - Load `raster-dem` tiles at the rounded zoom level, like raster sources and MapLibre GL JS ([#4650](https://github.com/maplibre/maplibre-native/pull/4650)).
 - Fix `line-gradient` being drawn as `line-color` when combined with `line-dasharray` ([#4725](https://github.com/maplibre/maplibre-native/pull/4725)).

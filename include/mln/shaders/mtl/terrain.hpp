@@ -19,9 +19,10 @@ enum {
 struct alignas(16) TerrainDrawableUBO {
     /*  0 */ float4x4 matrix;
     /* 64 */ float4 dem_coords;
-    /* 80 */
+    /* 80 */ float4 slope_params; // x = metres per tile unit
+    /* 96 */
 };
-static_assert(sizeof(TerrainDrawableUBO) == 5 * 16, "wrong size");
+static_assert(sizeof(TerrainDrawableUBO) == 6 * 16, "wrong size");
 
 struct alignas(16) TerrainTilePropsUBO {
     /*  0 */ float2 dem_tl;
@@ -38,9 +39,13 @@ struct alignas(16) TerrainEvaluatedPropsUBO {
     /* 20 */ float elevation_offset;
     /* 24 */ float pad1;
     /* 28 */ float pad2;
-    /* 32 */
+    /* 32 */ float4 haze_color; // distance haze, premultiplied; clear when there is none
+    /* 48 */ float2 haze_ramp;  // haze = clamp(x - y / view depth, 0, 1)^2
+    /* 56 */ float pad3;
+    /* 60 */ float pad4;
+    /* 64 */
 };
-static_assert(sizeof(TerrainEvaluatedPropsUBO) == 32, "wrong size");
+static_assert(sizeof(TerrainEvaluatedPropsUBO) == 64, "wrong size");
 
 )";
 
@@ -65,6 +70,8 @@ struct FragmentStage {
     float4 position [[position, invariant]];
     float2 uv;
     float elevation;
+    float3 normal;
+    float depth; // view depth, for the distance haze
 };
 
 FragmentStage vertex vertexMain(thread const VertexStage vertx [[stage_in]],
@@ -88,6 +95,20 @@ FragmentStage vertex vertexMain(thread const VertexStage vertx [[stage_in]],
     float elevation = get_elevation(pos, demTexture, demSampler, drawable.dem_coords, props.unpack,
                                     drawable.dem_coords.w, props.exaggeration, 1.0);
 
+    // Surface normal (x east, y south, z up) from central differences one DEM texel either side,
+    // in the same exaggerated metres the mesh is lifted by. The fragment stage turns steep
+    // ground into lit rock.
+    const float texel = 1.0 / max(drawable.dem_coords.x * drawable.dem_coords.w, 1e-4);
+    const float dx = get_elevation(pos + float2(texel, 0.0), demTexture, demSampler, drawable.dem_coords,
+                                   props.unpack, drawable.dem_coords.w, props.exaggeration, 1.0) -
+                     get_elevation(pos - float2(texel, 0.0), demTexture, demSampler, drawable.dem_coords,
+                                   props.unpack, drawable.dem_coords.w, props.exaggeration, 1.0);
+    const float dy = get_elevation(pos + float2(0.0, texel), demTexture, demSampler, drawable.dem_coords,
+                                   props.unpack, drawable.dem_coords.w, props.exaggeration, 1.0) -
+                     get_elevation(pos - float2(0.0, texel), demTexture, demSampler, drawable.dem_coords,
+                                   props.unpack, drawable.dem_coords.w, props.exaggeration, 1.0);
+    const float3 normal = normalize(float3(-dx, -dy, 2.0 * texel * drawable.slope_params.x));
+
     // Skirt vertices hang below the surface by elevation_offset, forming a curtain
     // that hides the cracks between neighbouring tiles at different zoom levels
     // (maplibre-gl-js u_ele_delta). pos.z carries the skirt flag.
@@ -98,6 +119,8 @@ FragmentStage vertex vertexMain(thread const VertexStage vertx [[stage_in]],
         .position  = position,
         .uv        = uv,
         .elevation = elevation,
+        .normal    = normal,
+        .depth     = position.w,
     };
 }
 
@@ -115,7 +138,26 @@ half4 fragment fragmentMain(FragmentStage in [[stage_in]],
     // 1.0 - uv.y. Metal's NDC is Y-up, so the RTT is stored upright and the V must NOT
     // be flipped here - sampling 1.0 - uv.y flips the draped map vertically (north/south
     // swapped about the view). Sample uv.y directly on Metal.
-    return half4(mapTexture.sample(mapSampler, float2(in.uv.x, in.uv.y)));
+    float4 color = mapTexture.sample(mapSampler, float2(in.uv.x, in.uv.y));
+
+    // Ground steeper than about 50 degrees stretches the top-down drape into streaks. Fade it
+    // toward lit rock (full by 65 degrees), keeping about a third of the drape so lines and
+    // overlays crossing a face stay visible. Gentler ground takes no part of this.
+    const float3 n = normalize(in.normal);
+    const float rock = 1.0 - smoothstep(0.4226, 0.6428, n.z); // cos 65, cos 50 degrees
+    if (rock > 0.0) {
+        const float shade = 0.55 + 0.6 * max(dot(n, float3(-0.5, -0.5, 0.7071)), 0.0); // sun from the north-west
+        const float3 lit = mix(float3(0.54), color.rgb, 0.35) * shade * color.a;
+        color.rgb = mix(color.rgb, lit, rock);
+    }
+
+    // Distance haze: past where it begins the ground fades toward the haze color, as gl-js's terrain fog
+    // does, to the full color (its alpha) where it ends (the ramp is TerrainLayerTweaker's). A zero
+    // ramp leaves the drape as it is.
+    float haze = clamp(props.haze_ramp.x - props.haze_ramp.y / max(in.depth, 1e-6), 0.0, 1.0);
+    haze *= haze;
+    color.rgb = color.rgb * (1.0 - props.haze_color.a * haze) + props.haze_color.rgb * (color.a * haze);
+    return half4(color);
 }
 )";
 };

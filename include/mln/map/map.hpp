@@ -8,6 +8,7 @@
 #include <mln/map/mode.hpp>
 #include <mln/map/projection_mode.hpp>
 #include <mln/storage/resource_options.hpp>
+#include <mln/util/color.hpp>
 #include <mln/util/action_journal_options.hpp>
 #include <mln/util/chrono.hpp>
 #include <mln/util/client_options.hpp>
@@ -118,10 +119,37 @@ public:
 
     // Projection
     ScreenCoordinate pixelForLatLng(const LatLng&) const;
+    /// Screen position of a point `elevationMeters` above sea level. With 3D terrain, pass the
+    /// (exaggerated) terrain height at that location - see `getTerrainElevation`, or use
+    /// `pixelForLatLngOnTerrain` - so annotations and markers land on the draped surface.
+    ScreenCoordinate pixelForLatLng(const LatLng&, double elevationMeters) const;
     LatLng latLngForPixel(const ScreenCoordinate&, LatLng::WrapMode = LatLng::Wrapped) const;
+    /// Geographic position of the point where the screen pixel's view ray crosses the plane
+    /// `elevationMeters` above sea level (exaggerated terrain units, as pixelForLatLng). A
+    /// terrain-aware pick marches this along the ray - see MLNMapView convertPoint:toLatLngFromView:.
+    LatLng latLngForPixel(const ScreenCoordinate&, double elevationMeters) const;
+    /// Geographic position under a screen pixel on the plane the camera's centre sits on
+    /// (CameraOptions::centerAltitude: sea level until a terrain gesture lifts it). For camera code
+    /// that turns a screen point into a camera centre: with 3D terrain, latLngForPixelOnTerrain
+    /// answers on the surface in front of that plane, and a centre taken from it moves the view by
+    /// about (terrain height - centre altitude) * tan(pitch).
+    LatLng latLngForPixelAtCenterAltitude(const ScreenCoordinate&) const;
     std::vector<ScreenCoordinate> pixelsForLatLngs(const std::vector<LatLng>&) const;
     std::vector<LatLng> latLngsForPixels(const std::vector<ScreenCoordinate>&,
                                          LatLng::WrapMode = LatLng::Wrapped) const;
+
+    // Projection onto 3D terrain. Answered from the map's copy of the renderer's terrain heights
+    // (RendererObserver::onTerrainElevationIndexChanged), so they never wait on the render side.
+    // Without terrain, or where no DEM is loaded yet, each falls back to its sea-level version.
+    /// Exaggerated terrain height in metres at a location; nullopt without terrain data there.
+    std::optional<double> getTerrainElevation(const LatLng&) const;
+    /// Screen position of the terrain surface at a location (pixelForLatLng at its height).
+    ScreenCoordinate pixelForLatLngOnTerrain(const LatLng&) const;
+    /// Location of the terrain surface under a screen pixel: the nearest surface along its view
+    /// ray, so a ridge in front wins.
+    LatLng latLngForPixelOnTerrain(const ScreenCoordinate&) const;
+    std::vector<ScreenCoordinate> pixelsForLatLngsOnTerrain(const std::vector<LatLng>&) const;
+    std::vector<LatLng> latLngsForPixelsOnTerrain(const std::vector<ScreenCoordinate>&) const;
 
     // Transform
     TransformState getTransformState() const;
@@ -225,6 +253,18 @@ public:
     /// No effect when terrain is not enabled.
     void setTerrainSkirtLength(TerrainSkirtLength length);
     TerrainSkirtLength getTerrainSkirtLength() const;
+
+    /// Distance haze over the terrain: ground far from the camera fades toward `color`, so the far edge
+    /// of the terrain blends into what is drawn behind the map instead of ending at a hard edge where
+    /// tiles pop in. `range` is how far the haze reaches, in multiples of the map center's distance from
+    /// the camera: ground that far away and beyond takes the full color (at its alpha). Nearer ground
+    /// fades toward it as in maplibre-gl-js's terrain fog with `fog-ground-blend` 0.5 and gl-js's far
+    /// plane at that distance, so the haze begins at 2 * range / (range + 1) times the center's distance.
+    /// As in gl-js, it fades in between pitches of 60 and 70 degrees. A range of 1 or less turns it off
+    /// (0, the default), and one above 1000 is held at 1000. No effect when terrain is not enabled.
+    void setTerrainHaze(const Color& color, float range);
+    Color getTerrainHazeColor() const;
+    float getTerrainHazeRange() const;
 
     /// Whether the map centre rides the terrain surface rather than sea level. Off by
     /// default; with it on the center altitude follows the rendered terrain height under the

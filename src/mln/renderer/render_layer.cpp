@@ -30,7 +30,12 @@ const std::string& RenderLayer::getId() const {
 
 void RenderLayer::transition(const TransitionParameters& parameters, Immutable<style::Layer::Impl> newImpl) {
     baseImpl = std::move(newImpl);
+    ++styleRevision;
     transition(parameters);
+}
+
+bool RenderLayer::settlesCrossfade(bool terrainEnabled) const {
+    return terrainEnabled && !is3D();
 }
 
 bool RenderLayer::needsPlacement() const {

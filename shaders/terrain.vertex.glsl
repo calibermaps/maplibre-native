@@ -1,9 +1,12 @@
 out vec2 v_uv;
 out float v_elevation;
+out vec3 v_normal;
+out highp float v_depth;
 
 layout (std140) uniform TerrainDrawableUBO {
     highp mat4 u_matrix;
     highp vec4 u_dem_tile_coords;
+    highp vec4 u_slope_params; // x = metres per tile unit
 };
 
 layout (std140) uniform TerrainEvaluatedPropsUBO {
@@ -12,6 +15,10 @@ layout (std140) uniform TerrainEvaluatedPropsUBO {
     highp float u_elevation_offset;
     lowp float props_pad1;
     lowp float props_pad2;
+    highp vec4 u_haze_color; // premultiplied; clear when there is no haze
+    highp vec2 u_haze_ramp; // haze = clamp(x - y / view depth, 0, 1)^2
+    lowp float props_pad3;
+    lowp float props_pad4;
 };
 
 layout (location = 0) in vec4 a_pos; // xy = tile position, z = skirt flag (1 = skirt vertex)
@@ -31,9 +38,25 @@ void main() {
     v_elevation = get_elevation(pos, u_dem, u_dem_tile_coords, u_unpack,
                                 u_dem_tile_coords.w, u_exaggeration, 1.0);
 
+    // Surface normal (x east, y south, z up) from central differences one DEM texel either side,
+    // in the same exaggerated metres the mesh is lifted by. The fragment stage turns steep
+    // ground into lit rock.
+    float texel = 1.0 / max(u_dem_tile_coords.x * u_dem_tile_coords.w, 1e-4);
+    float dx = get_elevation(pos + vec2(texel, 0.0), u_dem, u_dem_tile_coords, u_unpack,
+                             u_dem_tile_coords.w, u_exaggeration, 1.0) -
+               get_elevation(pos - vec2(texel, 0.0), u_dem, u_dem_tile_coords, u_unpack,
+                             u_dem_tile_coords.w, u_exaggeration, 1.0);
+    float dy = get_elevation(pos + vec2(0.0, texel), u_dem, u_dem_tile_coords, u_unpack,
+                             u_dem_tile_coords.w, u_exaggeration, 1.0) -
+               get_elevation(pos - vec2(0.0, texel), u_dem, u_dem_tile_coords, u_unpack,
+                             u_dem_tile_coords.w, u_exaggeration, 1.0);
+    v_normal = normalize(vec3(-dx, -dy, 2.0 * texel * u_slope_params.x));
+
     // Skirt vertices hang below the surface by u_elevation_offset, forming a
     // curtain that hides the cracks between neighbouring tiles at different zoom
     // levels (maplibre-gl-js u_ele_delta).
     float ele_delta = a_pos.z == 1.0 ? u_elevation_offset : 0.0;
     gl_Position = u_matrix * vec4(pos.x, pos.y, v_elevation - ele_delta, 1.0);
+    // The view depth, for the distance haze
+    v_depth = gl_Position.w;
 }
