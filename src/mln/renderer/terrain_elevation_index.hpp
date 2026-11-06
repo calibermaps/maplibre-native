@@ -42,20 +42,29 @@ public:
         std::shared_ptr<const Grid> grid;
     };
 
-    TerrainElevationIndex(std::vector<Tile> tiles, float exaggeration);
+    /// `held`: the heights of the surface this one is replacing (a switch of terrain source or
+    /// exaggeration, until its fade ends); the camera must clear whichever surface is higher, so an
+    /// answer is the higher of the two and a point only the old surface covers is still answered.
+    TerrainElevationIndex(std::vector<Tile> tiles,
+                          float exaggeration,
+                          std::shared_ptr<const TerrainElevationIndex> held = nullptr);
     // The zoom levels point into `tiles`
     TerrainElevationIndex(const TerrainElevationIndex&) = delete;
     TerrainElevationIndex& operator=(const TerrainElevationIndex&) = delete;
 
     /// Exaggerated terrain height in metres at `latLng`, sampled from the deepest tile that
-    /// covers it, as RenderTerrain::getElevationForLatLng. Nullopt where no DEM tile is loaded.
+    /// covers it, as RenderTerrain::getElevationForLatLng (the higher of that and the held
+    /// surface's). Nullopt where no DEM tile is loaded.
     std::optional<double> getElevation(const LatLng& latLng) const;
+    /// The same from this index's own tiles alone
+    std::optional<double> getOwnElevation(const LatLng& latLng) const;
 
     float getExaggeration() const { return exaggeration; }
     /// Exaggerated height in metres of the highest point in any of the tiles; where the terrain
     /// pick can start its march (pickTerrainSurface).
     double getMaxElevation() const { return maxElevation; }
     const std::vector<Tile>& getTiles() const { return tiles; }
+    const std::shared_ptr<const TerrainElevationIndex>& getHeld() const { return held; }
 
 private:
     struct Level {
@@ -69,6 +78,7 @@ private:
     }
 
     std::vector<Tile> tiles;
+    std::shared_ptr<const TerrainElevationIndex> held;
     /// Deepest zoom first, so the first hit is the finest data
     std::vector<Level> levels;
     float exaggeration;

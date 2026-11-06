@@ -265,11 +265,16 @@ std::unique_ptr<RenderTree> RenderOrchestrator::createRenderTree(
     // well as on removal: the orchestrator holds its own reference and keeps drawing an
     // orphaned mesh otherwise, and the layer index is a multimap key, so a replacement
     // stacks up beside the old one rather than evicting it.
+    // The terrain a changed one replaces keeps its surface for the new one to fade from
+    // (RenderTerrain::inheritSurface): a switch of source or exaggeration (LiDAR 3D on or off)
+    // moves the ground everywhere, and without it every tile would drop to the flat placeholder
+    // and jump up again.
+    std::unique_ptr<RenderTerrain> replacedTerrain;
     const auto dropRenderTerrain = [&] {
         UniqueChangeRequestVec terrainChanges;
         renderTerrain->deactivate(terrainChanges);
         addChanges(terrainChanges);
-        renderTerrain.reset();
+        replacedTerrain = std::move(renderTerrain);
     };
 
     if (updateParameters->terrain) {
@@ -278,6 +283,9 @@ std::unique_ptr<RenderTree> RenderOrchestrator::createRenderTree(
         }
         if (!renderTerrain) {
             renderTerrain = std::make_unique<RenderTerrain>(*updateParameters->terrain);
+            if (replacedTerrain) {
+                renderTerrain->inheritSurface(*replacedTerrain, updateParameters->timePoint);
+            }
         }
     } else if (renderTerrain) {
         dropRenderTerrain();

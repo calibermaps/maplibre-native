@@ -10,7 +10,8 @@ struct alignas(16) TerrainDrawableUBO {
     /* 64 */ std::array<float, 4> dem_coords; // scale, x offset, y offset into the bound DEM
                                               // tile ({1,0,0,0} unless an ancestor is bound)
     /* 80 */ std::array<float, 4> slope_params; // x = metres per tile unit (rock shading of steep
-                                                // ground); yzw reserved
+                                                // ground); yzw = scale, x offset, y offset into the
+                                                // DEM being blended away from (dem_blend < 1)
     /* 96 */
 };
 static_assert(sizeof(TerrainDrawableUBO) == 6 * 16);
@@ -49,9 +50,14 @@ struct alignas(16) TerrainEvaluatedPropsUBO {
     /* 48 */ std::array<float, 2> haze_ramp;  // haze = clamp(x - y / view depth, 0, 1)^2 (TerrainLayerTweaker)
     /* 56 */ float pad3;
     /* 60 */ float pad4;
-    /* 64 */
+    /* 64 */ std::array<float, 4> unpack_from; // the DEM unpack vector of the surface being blended away from
+    /* 80 */ float exaggeration_from;
+    /* 84 */ float dem_dim_from;
+    /* 88 */ float dem_blend; // 1 = the surface is the bound DEM; below 1 it is blended up from the old DEM
+    /* 92 */ float pad5;
+    /* 96 */
 };
-static_assert(sizeof(TerrainEvaluatedPropsUBO) == 64);
+static_assert(sizeof(TerrainEvaluatedPropsUBO) == 96);
 
 } // namespace shaders
 } // namespace mln

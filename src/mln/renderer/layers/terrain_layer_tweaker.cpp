@@ -83,7 +83,12 @@ void TerrainLayerTweaker::execute(LayerGroupBase& layerGroup, const PaintParamet
         .haze_color = {hazeColor.r, hazeColor.g, hazeColor.b, hazeColor.a},
         .haze_ramp = hazeRamp,
         .pad3 = 0.0f,
-        .pad4 = 0.0f};
+        .pad4 = 0.0f,
+        .unpack_from = terrain->getFromUnpackVector(),
+        .exaggeration_from = terrain->getFromExaggeration(),
+        .dem_dim_from = terrain->getFromDemDim(),
+        .dem_blend = terrain->surfaceBlend(),
+        .pad5 = 0.0f};
     layerUniforms.createOrUpdate(idTerrainEvaluatedPropsUBO, &propsUBO, context);
 
 #if MLN_UBO_CONSOLIDATION
@@ -128,7 +133,10 @@ void TerrainLayerTweaker::execute(LayerGroupBase& layerGroup, const PaintParamet
 #endif
             .matrix = util::cast<float>(matrix),
             .dem_coords = terrain->getDrawableDemCoords(*drawable.getTileID()),
-            .slope_params = {{metersPerTileUnit(*drawable.getTileID()), 0.0f, 0.0f, 0.0f}}
+            .slope_params = {{metersPerTileUnit(*drawable.getTileID()),
+                              terrain->getDrawableDemCoordsFrom(*drawable.getTileID())[0],
+                              terrain->getDrawableDemCoordsFrom(*drawable.getTileID())[1],
+                              terrain->getDrawableDemCoordsFrom(*drawable.getTileID())[2]}}
         };
 
 #if !MLN_UBO_CONSOLIDATION

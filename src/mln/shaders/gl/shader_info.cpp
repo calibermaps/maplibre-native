@@ -566,6 +566,7 @@ const std::vector<AttributeInfo> TerrainShaderInfo::attributes = {
 const std::vector<TextureInfo> TerrainShaderInfo::textures = {
     TextureInfo{"u_dem", idTerrainDEMTexture},
     TextureInfo{"u_map", idTerrainMapTexture},
+    TextureInfo{"u_dem_from", idTerrainDEMFromTexture},
 };
 
 // Terrain Depth

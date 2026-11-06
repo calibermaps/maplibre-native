@@ -43,9 +43,14 @@ struct alignas(16) TerrainEvaluatedPropsUBO {
     /* 48 */ float2 haze_ramp;  // haze = clamp(x - y / view depth, 0, 1)^2
     /* 56 */ float pad3;
     /* 60 */ float pad4;
-    /* 64 */
+    /* 64 */ float4 unpack_from; // DEM unpack vector of the surface being blended away from
+    /* 80 */ float exaggeration_from;
+    /* 84 */ float dem_dim_from;
+    /* 88 */ float dem_blend; // 1 = the surface is the bound DEM; below 1, blended up from the old DEM
+    /* 92 */ float pad5;
+    /* 96 */
 };
-static_assert(sizeof(TerrainEvaluatedPropsUBO) == 64, "wrong size");
+static_assert(sizeof(TerrainEvaluatedPropsUBO) == 96, "wrong size");
 
 )";
 
@@ -57,7 +62,7 @@ struct ShaderSource<BuiltIn::TerrainShader, gfx::Backend::Type::Metal> {
 
     static const std::array<AttributeInfo, 1> attributes;
     static constexpr std::array<AttributeInfo, 0> instanceAttributes{};
-    static const std::array<TextureInfo, 2> textures;
+    static const std::array<TextureInfo, 3> textures;
 
     static constexpr auto prelude = terrainShaderPrelude;
     static constexpr auto source = R"(
@@ -74,12 +79,34 @@ struct FragmentStage {
     float depth; // view depth, for the distance haze
 };
 
+// The surface height at a tile-local point: the bound DEM's, or while the terrain blends from
+// another DEM the old DEM's height mixed into it.
+inline float terrainSurface(float2 pos,
+                            float4 demCoords,
+                            device const TerrainEvaluatedPropsUBO& props,
+                            float4 fromCoords,
+                            texture2d<float, access::sample> demTexture,
+                            sampler demSampler,
+                            texture2d<float, access::sample> demFromTexture,
+                            sampler demFromSampler) {
+    const float toHeight = get_elevation(
+        pos, demTexture, demSampler, demCoords, props.unpack, demCoords.w, props.exaggeration, 1.0);
+    if (props.dem_blend >= 1.0) {
+        return toHeight;
+    }
+    const float fromHeight = get_elevation(pos, demFromTexture, demFromSampler, fromCoords, props.unpack_from,
+                                           props.dem_dim_from, props.exaggeration_from, 1.0);
+    return mix(fromHeight, toHeight, props.dem_blend);
+}
+
 FragmentStage vertex vertexMain(thread const VertexStage vertx [[stage_in]],
                                 device const uint32_t& uboIndex [[buffer(idGlobalUBOIndex)]],
                                 device const TerrainDrawableUBO* drawableVector [[buffer(idTerrainDrawableUBO)]],
                                 device const TerrainEvaluatedPropsUBO& props [[buffer(idTerrainEvaluatedPropsUBO)]],
                                 texture2d<float, access::sample> demTexture [[texture(0)]],
-                                sampler demSampler [[sampler(0)]]) {
+                                sampler demSampler [[sampler(0)]],
+                                texture2d<float, access::sample> demFromTexture [[texture(2)]],
+                                sampler demFromSampler [[sampler(2)]]) {
 
     device const TerrainDrawableUBO& drawable = drawableVector[uboIndex];
 
@@ -92,21 +119,25 @@ FragmentStage vertex vertexMain(thread const VertexStage vertx [[stage_in]],
     // NEAREST and interpolated after decoding, matching maplibre-gl-js and the
     // elevated layers). Map into the bound DEM tile; an ancestor tile is bound as
     // a fallback while this tile's own DEM loads. dem_coords.w = DEM dimension.
-    float elevation = get_elevation(pos, demTexture, demSampler, drawable.dem_coords, props.unpack,
-                                    drawable.dem_coords.w, props.exaggeration, 1.0);
+    // While the terrain blends from another DEM (a finer tile replacing an ancestor, or a new
+    // source or exaggeration), the old DEM's height is mixed in by one blend value for every
+    // tile; the old DEM is read only then.
+    const float4 fromCoords = float4(drawable.slope_params.yzw, props.dem_dim_from);
+    const float elevation = terrainSurface(pos, drawable.dem_coords, props, fromCoords,
+                                           demTexture, demSampler, demFromTexture, demFromSampler);
 
     // Surface normal (x east, y south, z up) from central differences one DEM texel either side,
     // in the same exaggerated metres the mesh is lifted by. The fragment stage turns steep
     // ground into lit rock.
     const float texel = 1.0 / max(drawable.dem_coords.x * drawable.dem_coords.w, 1e-4);
-    const float dx = get_elevation(pos + float2(texel, 0.0), demTexture, demSampler, drawable.dem_coords,
-                                   props.unpack, drawable.dem_coords.w, props.exaggeration, 1.0) -
-                     get_elevation(pos - float2(texel, 0.0), demTexture, demSampler, drawable.dem_coords,
-                                   props.unpack, drawable.dem_coords.w, props.exaggeration, 1.0);
-    const float dy = get_elevation(pos + float2(0.0, texel), demTexture, demSampler, drawable.dem_coords,
-                                   props.unpack, drawable.dem_coords.w, props.exaggeration, 1.0) -
-                     get_elevation(pos - float2(0.0, texel), demTexture, demSampler, drawable.dem_coords,
-                                   props.unpack, drawable.dem_coords.w, props.exaggeration, 1.0);
+    const float dx = terrainSurface(pos + float2(texel, 0.0), drawable.dem_coords, props, fromCoords,
+                                    demTexture, demSampler, demFromTexture, demFromSampler) -
+                     terrainSurface(pos - float2(texel, 0.0), drawable.dem_coords, props, fromCoords,
+                                    demTexture, demSampler, demFromTexture, demFromSampler);
+    const float dy = terrainSurface(pos + float2(0.0, texel), drawable.dem_coords, props, fromCoords,
+                                    demTexture, demSampler, demFromTexture, demFromSampler) -
+                     terrainSurface(pos - float2(0.0, texel), drawable.dem_coords, props, fromCoords,
+                                    demTexture, demSampler, demFromTexture, demFromSampler);
     const float3 normal = normalize(float3(-dx, -dy, 2.0 * texel * drawable.slope_params.x));
 
     // Skirt vertices hang below the surface by elevation_offset, forming a curtain

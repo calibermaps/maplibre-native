@@ -13,6 +13,11 @@ layout (std140) uniform TerrainEvaluatedPropsUBO {
     highp vec2 u_haze_ramp; // haze = clamp(x - y / view depth, 0, 1)^2
     lowp float props_pad3;
     lowp float props_pad4;
+    highp vec4 u_unpack_from; // the DEM unpack vector of the surface being blended away from
+    highp float u_exaggeration_from;
+    highp float u_dem_dim_from;
+    highp float u_dem_blend; // 1 = the surface is the bound DEM; below 1, blended up from u_dem_from
+    lowp float props_pad5;
 };
 
 uniform sampler2D u_map;
