@@ -5,6 +5,7 @@
 #include <mln/gfx/headless_frontend.hpp>
 #include <mln/map/camera.hpp>
 #include <mln/map/map_options.hpp>
+#include <mln/style/image.hpp>
 #include <mln/style/style.hpp>
 #include <mln/util/image.hpp>
 #include <mln/util/projection.hpp>
@@ -84,7 +85,11 @@ const std::string occlusionStyle = R"STYLE({
   ]
 })STYLE";
 
-// Two points, one in front of the ridge and one behind it, drawn as red circles
+// Two points, one in front of the ridge and one behind it, drawn as red icons (the image is added below)
+const std::string symbolLayer = R"({"id": "icons", "type": "symbol", "source": "icons",
+     "layout": {"icon-image": "dot", "icon-allow-overlap": true, "icon-ignore-placement": true}})";
+
+// ... as red circles
 const std::string circleLayer = R"({"id": "icons", "type": "circle", "source": "icons",
      "paint": {"circle-color": "#ff0000", "circle-radius": 6, "circle-opacity": 1}})";
 
@@ -133,6 +138,14 @@ void expectOnlyTheNearPointIsDrawn(const std::string& layer) {
     style.replace(style.find("ICONS_LAYER"), std::string("ICONS_LAYER").size(), layer);
     style.replace(style.find("BEHIND_LAT"), std::string("BEHIND_LAT").size(), std::to_string(behindLat));
     map.getStyle().loadJSON(style);
+    PremultipliedImage dot({12, 12});
+    for (uint32_t i = 0; i < 12 * 12; ++i) {
+        dot.data[i * 4 + 0] = 255;
+        dot.data[i * 4 + 1] = 0;
+        dot.data[i * 4 + 2] = 0;
+        dot.data[i * 4 + 3] = 255;
+    }
+    map.getStyle().addImage(std::make_unique<style::Image>("dot", std::move(dot), 1.0f));
     map.jumpTo(
         CameraOptions().withCenter(LatLng{centreLat, centreLon}).withZoom(12.0).withPitch(60.0).withBearing(0.0));
 
@@ -154,10 +167,21 @@ void expectOnlyTheNearPointIsDrawn(const std::string& layer) {
 
 } // namespace
 
+TEST(TerrainOcclusion, AnIconBehindARidgeIsHidden) {
+    expectOnlyTheNearPointIsDrawn(symbolLayer);
+}
+
+// Only the OpenGL and Metal circle and heatmap shaders read the terrain depth texture
 TEST(TerrainOcclusion, ACircleBehindARidgeIsHidden) {
+#if !(MLN_RENDER_BACKEND_OPENGL || MLN_RENDER_BACKEND_METAL)
+    GTEST_SKIP() << "circles are not hidden behind terrain on this backend";
+#endif
     expectOnlyTheNearPointIsDrawn(circleLayer);
 }
 
 TEST(TerrainOcclusion, AHeatmapBehindARidgeIsHidden) {
+#if !(MLN_RENDER_BACKEND_OPENGL || MLN_RENDER_BACKEND_METAL)
+    GTEST_SKIP() << "heatmaps are not hidden behind terrain on this backend";
+#endif
     expectOnlyTheNearPointIsDrawn(heatmapLayer);
 }
