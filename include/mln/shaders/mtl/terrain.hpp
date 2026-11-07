@@ -39,9 +39,13 @@ struct alignas(16) TerrainEvaluatedPropsUBO {
     /* 20 */ float elevation_offset;
     /* 24 */ float pad1;
     /* 28 */ float pad2;
-    /* 32 */
+    /* 32 */ float4 haze_color; // distance haze, premultiplied; clear when there is none
+    /* 48 */ float2 haze_ramp;  // haze = clamp(x - y / view depth, 0, 1)^2
+    /* 56 */ float pad3;
+    /* 60 */ float pad4;
+    /* 64 */
 };
-static_assert(sizeof(TerrainEvaluatedPropsUBO) == 32, "wrong size");
+static_assert(sizeof(TerrainEvaluatedPropsUBO) == 64, "wrong size");
 
 )";
 
@@ -67,6 +71,7 @@ struct FragmentStage {
     float2 uv;
     float elevation;
     float3 normal;
+    float depth; // view depth, for the distance haze
 };
 
 FragmentStage vertex vertexMain(thread const VertexStage vertx [[stage_in]],
@@ -115,6 +120,7 @@ FragmentStage vertex vertexMain(thread const VertexStage vertx [[stage_in]],
         .uv        = uv,
         .elevation = elevation,
         .normal    = normal,
+        .depth     = position.w,
     };
 }
 
@@ -144,6 +150,12 @@ half4 fragment fragmentMain(FragmentStage in [[stage_in]],
         const float3 lit = mix(float3(0.54), color.rgb, 0.35) * shade * color.a;
         color.rgb = mix(color.rgb, lit, rock);
     }
+    // Distance haze: past where it begins the ground fades toward the haze color, as gl-js's terrain fog
+    // does, to the full color (its alpha) where it ends (the ramp is TerrainLayerTweaker's). A zero
+    // ramp leaves the drape as it is.
+    float haze = clamp(props.haze_ramp.x - props.haze_ramp.y / max(in.depth, 1e-6), 0.0, 1.0);
+    haze *= haze;
+    color.rgb = color.rgb * (1.0 - props.haze_color.a * haze) + props.haze_color.rgb * (color.a * haze);
     return half4(color);
 }
 )";
