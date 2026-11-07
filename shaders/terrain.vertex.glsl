@@ -1,9 +1,11 @@
 out vec2 v_uv;
 out float v_elevation;
+out vec3 v_normal;
 
 layout (std140) uniform TerrainDrawableUBO {
     highp mat4 u_matrix;
     highp vec4 u_dem_tile_coords;
+    highp vec4 u_slope_params; // x = metres per tile unit
 };
 
 layout (std140) uniform TerrainEvaluatedPropsUBO {
@@ -30,6 +32,20 @@ void main() {
     // as a fallback while this tile's own DEM loads. dem_coords.w = DEM dimension.
     v_elevation = get_elevation(pos, u_dem, u_dem_tile_coords, u_unpack,
                                 u_dem_tile_coords.w, u_exaggeration, 1.0);
+
+    // Surface normal (x east, y south, z up) from central differences one DEM texel either side,
+    // in the same exaggerated metres the mesh is lifted by. The fragment stage turns steep
+    // ground into lit rock.
+    float texel = 1.0 / max(u_dem_tile_coords.x * u_dem_tile_coords.w, 1e-4);
+    float dx = get_elevation(pos + vec2(texel, 0.0), u_dem, u_dem_tile_coords, u_unpack,
+                             u_dem_tile_coords.w, u_exaggeration, 1.0) -
+               get_elevation(pos - vec2(texel, 0.0), u_dem, u_dem_tile_coords, u_unpack,
+                             u_dem_tile_coords.w, u_exaggeration, 1.0);
+    float dy = get_elevation(pos + vec2(0.0, texel), u_dem, u_dem_tile_coords, u_unpack,
+                             u_dem_tile_coords.w, u_exaggeration, 1.0) -
+               get_elevation(pos - vec2(0.0, texel), u_dem, u_dem_tile_coords, u_unpack,
+                             u_dem_tile_coords.w, u_exaggeration, 1.0);
+    v_normal = normalize(vec3(-dx, -dy, 2.0 * texel * u_slope_params.x));
 
     // Skirt vertices hang below the surface by u_elevation_offset, forming a
     // curtain that hides the cracks between neighbouring tiles at different zoom

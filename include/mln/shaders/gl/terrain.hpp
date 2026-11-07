@@ -10,10 +10,12 @@ struct ShaderSource<BuiltIn::TerrainShader, gfx::Backend::Type::OpenGL> {
     static constexpr const char* name = "TerrainShader";
     static constexpr const char* vertex = R"(out vec2 v_uv;
 out float v_elevation;
+out vec3 v_normal;
 
 layout (std140) uniform TerrainDrawableUBO {
     highp mat4 u_matrix;
     highp vec4 u_dem_tile_coords;
+    highp vec4 u_slope_params; // x = metres per tile unit
 };
 
 layout (std140) uniform TerrainEvaluatedPropsUBO {
@@ -41,6 +43,20 @@ void main() {
     v_elevation = get_elevation(pos, u_dem, u_dem_tile_coords, u_unpack,
                                 u_dem_tile_coords.w, u_exaggeration, 1.0);
 
+    // Surface normal (x east, y south, z up) from central differences one DEM texel either side,
+    // in the same exaggerated metres the mesh is lifted by. The fragment stage turns steep
+    // ground into lit rock.
+    float texel = 1.0 / max(u_dem_tile_coords.x * u_dem_tile_coords.w, 1e-4);
+    float dx = get_elevation(pos + vec2(texel, 0.0), u_dem, u_dem_tile_coords, u_unpack,
+                             u_dem_tile_coords.w, u_exaggeration, 1.0) -
+               get_elevation(pos - vec2(texel, 0.0), u_dem, u_dem_tile_coords, u_unpack,
+                             u_dem_tile_coords.w, u_exaggeration, 1.0);
+    float dy = get_elevation(pos + vec2(0.0, texel), u_dem, u_dem_tile_coords, u_unpack,
+                             u_dem_tile_coords.w, u_exaggeration, 1.0) -
+               get_elevation(pos - vec2(0.0, texel), u_dem, u_dem_tile_coords, u_unpack,
+                             u_dem_tile_coords.w, u_exaggeration, 1.0);
+    v_normal = normalize(vec3(-dx, -dy, 2.0 * texel * u_slope_params.x));
+
     // Skirt vertices hang below the surface by u_elevation_offset, forming a
     // curtain that hides the cracks between neighbouring tiles at different zoom
     // levels (maplibre-gl-js u_ele_delta).
@@ -50,6 +66,7 @@ void main() {
 )";
     static constexpr const char* fragment = R"(in vec2 v_uv;
 in float v_elevation;
+in vec3 v_normal;
 
 uniform sampler2D u_map;
 
@@ -57,6 +74,17 @@ void main() {
     // Sample the map texture (render-to-texture output) for the surface color
     // Note: Y-coordinate is flipped (1.0 - y) to match OpenGL convention
     fragColor = texture(u_map, vec2(v_uv.x, 1.0 - v_uv.y));
+
+    // Ground steeper than about 50 degrees stretches the top-down drape into streaks. Fade it
+    // toward lit rock (full by 65 degrees), keeping about a third of the drape so lines and
+    // overlays crossing a face stay visible. Gentler ground takes no part of this.
+    vec3 n = normalize(v_normal);
+    float rock = 1.0 - smoothstep(0.4226, 0.6428, n.z); // cos 65, cos 50 degrees
+    if (rock > 0.0) {
+        float shade = 0.55 + 0.6 * max(dot(n, vec3(-0.5, -0.5, 0.7071)), 0.0); // sun from the north-west
+        vec3 lit = mix(vec3(0.54), fragColor.rgb, 0.35) * shade * fragColor.a;
+        fragColor.rgb = mix(fragColor.rgb, lit, rock);
+    }
 
 #if defined(OVERDRAW_INSPECTOR)
     fragColor = vec4(1.0);
