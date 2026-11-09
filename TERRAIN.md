@@ -335,7 +335,7 @@ filled in by @daviani on an iPhone 16 Pro Max / iOS 26.6, built for device with
 | builds | yes | yes | **yes** (bazel, for device) | yes (Dawn) |
 | terrain renders | yes | **yes, verified on device** | **yes, verified on device** | untested |
 | terrain off->on (all 3 load modes) | yes | **yes, verified** | **yes** (via style JSON; load modes not separated) | untested |
-| symbol occlusion | yes | looks correct on device | untested (code path is complete; see below) | untested |
+| symbol occlusion | yes | same scheme as GL and Metal ([#4559](https://github.com/maplibre/maplibre-native/pull/4559)); shaders compile to SPIR-V, not yet re-checked on a device. The earlier "looks correct on device" was with the gl-js ramp of 500, which cannot fire at native's 1 px near plane | verified on the iOS simulator (2026-09-05) after scaling the fade ramp to native's 1 px near plane and packing the depth as exact base-256 digits | same scheme as GL and Metal ([#4559](https://github.com/maplibre/maplibre-native/pull/4559)); untested |
 | **fill-extrusion elevation** | yes | **yes** (2026-08-01, render test pixel-matches the GL baseline) | **yes** (2026-08-02, shaders sample the DEM; CI confirmation pending) | yes |
 | instanced depth pass | yes (GL-only by design) | n/a (per-tile path) | n/a | n/a |
 
@@ -1032,8 +1032,8 @@ This known issue is closed.
 ### Phase 3 - Seams and quality
 
 - **Drape target size** (`Renderer::Impl::texturePool`). Now `drapeTileSize *
-  drapeQualityFactor` = 512 * 2 = **1024x1024**, matching maplibre-gl-js, which
-  renders its render-to-texture tiles at `tileSize * qualityFactor` (a fixed
+  drapeQualityFactor` = 512 * 2 = **1024x1024** for the finest tiles of the cover and 512x512 for the rest.
+  maplibre-gl-js renders its render-to-texture tiles at `tileSize * qualityFactor` (a fixed
   `qualityFactor = 2`) *specifically* so draped thin lines are not pixelated/
   aliased when the mesh magnifies them (`src/render/terrain.ts`,
   `src/webgl/render_to_texture.ts` `rttSize`). This was the fix for draped roads

@@ -18,6 +18,7 @@ namespace mln {
 
 namespace gfx {
 class Context;
+class Drawable;
 class Texture2D;
 class OffscreenTexture;
 class UniformBuffer;
@@ -55,6 +56,12 @@ public:
     /// Refresh this drape target's copy of the global paint parameters,
     /// carrying the target tile in `drape_tile` (no-op for non-drape targets)
     void updateDrapeGlobalUBO(const shaders::GlobalPaintParamsUBO& params, gfx::Context& context);
+
+    /// Identity of the data a draped drawable draws (its source bucket's id, 0 when it has none),
+    /// so a drape re-renders when a tile gets new data under the same tile id: a GeoJSON source
+    /// updated with setGeoJson, or a tile's own bucket replacing an over-zoomed ancestor's. Stable
+    /// across fades and paint changes, unlike drawable ids.
+    static std::size_t drapedDataID(const gfx::Drawable&);
 
     /// Get the render target texture
     const gfx::Texture2DPtr& getTexture();
@@ -112,6 +119,13 @@ public:
     /// so a burst of dirty drape targets is spread across frames rather than stalling one.
     RenderResult render(RenderOrchestrator&, const RenderTree&, PaintParameters&, bool canRerender = true);
 
+    /// Forget what this drape target baked, so its next render evaluates and bakes again. For a
+    /// render that threw part-way (out of GPU memory): the bake was recorded before it started.
+    void invalidateBake() {
+        bakedCoverage = {};
+        bakedSignature.reset();
+    }
+
 protected:
     void renderDrapedLayerGroups(RenderOrchestrator&, PaintParameters&);
 
@@ -123,17 +137,16 @@ protected:
         /// tiles, an ancestor n levels up, or nothing - see terrain::DrapeGroupFallback
         std::vector<terrain::DrapeGroupFallback> groups;
 
-        /// Hash of the covering tile ids overlapping this target, each with its source bucket's
-        /// id (summed, order-independent), so it changes only when the SET of covering tiles or
-        /// their data changes - a tile loading, unloading or getting new data (a GeoJSON source
-        /// update), or an integer-zoom crossing. Deliberately NOT keyed on drawable-instance
-        /// ids: those are rebuilt with fresh ids every frame during fades/bucket updates, which
-        /// churned the signature and re-rendered every drape each frame while panning.
+        /// Hash of the tiles overlapping this target and the data on them, summed over the
+        /// draped layer groups (see terrain::DrapeGroupCoverage), so it changes only when the
+        /// tiles or their data change - a tile loading, unloading, getting new data or emptied,
+        /// or an integer-zoom crossing.
         std::size_t contentHash = 0;
-        /// The part of contentHash that comes from the style revisions of the covering layers
-        /// (an app animating a draped layer). A change here is a genuine change of look, never
-        /// a transient drop-out, so it is exempt from the keep-the-better-bake rule.
-        std::size_t revisionHash = 0;
+        /// The style revision of each draped layer group where it covers this target, in the order
+        /// of `groups` (0 for a group with no revision, or one that covers nothing here). Part of
+        /// contentHash. A change here is a genuine change of look (an app animating a draped
+        /// layer), never a transient drop-out, so it is exempt from the keep-the-better-bake rule.
+        std::vector<std::size_t> groupRevisions;
         /// Integer tile-zoom (draped UBOs carry zoom-derived values like line ratio);
         /// stored quantized so a pinch within one zoom level does not invalidate the
         /// cache. See computeDrapeCoverage.
@@ -157,6 +170,10 @@ protected:
         /// over groups - see terrain::drapeFallbackStrictlyWorse.
         bool worseThan(const DrapeCoverage& other) const {
             return terrain::drapeFallbackStrictlyWorse(groups, other.groups);
+        }
+        /// Whether a layer group's style revision changed between `other` and this.
+        bool revisionChangedFrom(const DrapeCoverage& other) const {
+            return terrain::drapeRevisionChanged(groupRevisions, other.groupRevisions);
         }
     };
     DrapeCoverage computeDrapeCoverage(RenderOrchestrator&, const PaintParameters&) const;
