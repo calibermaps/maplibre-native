@@ -167,8 +167,9 @@ TEST(TerrainDrape, CrossingALevelMatchesFreshTerrainDrawables) {
         gfx::BackendScope guard{*frontend.getBackend()};
         return frontend.readStillImage();
     };
-    // True once the frame has stayed the same for a second and a half and the map has said it is idle,
-    // or, when it has not said so, six seconds have passed; false if a minute passes first.
+    // True once the frame has stayed the same for a second and a half and the map has said it is idle;
+    // false if a minute passes first. A frame that merely stopped changing, with tiles still on the
+    // way, does not count.
     const auto settle = [&] {
         idle = false;
         const auto start = std::chrono::steady_clock::now();
@@ -176,8 +177,7 @@ TEST(TerrainDrape, CrossingALevelMatchesFreshTerrainDrawables) {
         PremultipliedImage last = read();
         int unchanged = 0;
         while (std::chrono::steady_clock::now() - start < std::chrono::seconds(60)) {
-            const bool waited = std::chrono::steady_clock::now() - start > std::chrono::seconds(6);
-            if (unchanged >= 6 && (idle || waited)) return true;
+            if (unchanged >= 6 && idle) return true;
             pump(std::chrono::milliseconds(250));
             PremultipliedImage now = read();
             const bool same = std::memcmp(now.data.get(), last.data.get(), now.bytes()) == 0;
@@ -193,6 +193,20 @@ TEST(TerrainDrape, CrossingALevelMatchesFreshTerrainDrawables) {
     pump(std::chrono::milliseconds(1500));
     ASSERT_TRUE(settle());
     const PremultipliedImage stepped = read();
+
+    // The picture is drawn: both colors of the checkerboard are in the middle of the view. Two blank
+    // frames would match each other and the comparison below would prove nothing.
+    size_t light = 0;
+    size_t dark = 0;
+    for (uint32_t y = 337; y < 537; ++y) {
+        for (uint32_t x = 101; x < 301; ++x) {
+            const uint8_t red = stepped.data.get()[(y * stepped.size.width + x) * 4];
+            light += red > 180 ? 1 : 0;
+            dark += red < 80 ? 1 : 0;
+        }
+    }
+    ASSERT_GT(light, 2000u) << "the ground tiles did not draw";
+    ASSERT_GT(dark, 2000u) << "the ground tiles did not draw";
 
     // An exaggeration of 1.0001 instead of 1 shows nothing but makes the renderer replace its
     // RenderTerrain: new terrain drawables, on the drape targets the map already has.
