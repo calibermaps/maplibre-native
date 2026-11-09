@@ -202,9 +202,10 @@ RenderTerrain::DrapeSizes RenderTerrain::drapeSizesFor(MapMode mode,
                                                        const std::array<double, 2>& origin,
                                                        const std::set<UnwrappedTileID>& hadFullSize) {
     if (mode == MapMode::Continuous) {
-        return {fullSizeDrapeTilesOf(cover, origin, hadFullSize), static_cast<size_t>(std::max(drapeCap, 0))};
+        return {.fullSizeTiles = fullSizeDrapeTilesOf(cover, origin, hadFullSize),
+                .maxResizes = static_cast<size_t>(std::max(drapeCap, 0))};
     }
-    return {fullSizeDrapeTilesOf(cover, origin, {}, fullSizeDrapeMax), 0};
+    return {.fullSizeTiles = fullSizeDrapeTilesOf(cover, origin, {}, fullSizeDrapeMax), .maxResizes = 0};
 }
 
 std::set<UnwrappedTileID> RenderTerrain::computeMeshCover(

@@ -116,6 +116,10 @@ int differingPerMille(const PremultipliedImage& a, const PremultipliedImage& b) 
     EXPECT_EQ(a.size.height, b.size.height);
     size_t count = 0;
     const size_t pixels = static_cast<size_t>(a.size.width) * a.size.height;
+    if (pixels == 0) {
+        ADD_FAILURE() << "Empty image";
+        return 1000;
+    }
     for (size_t i = 0; i < pixels; ++i) {
         const uint8_t* pa = a.data.get() + i * 4;
         const uint8_t* pb = b.data.get() + i * 4;
