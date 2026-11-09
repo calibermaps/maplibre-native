@@ -7,8 +7,8 @@ namespace shaders {
 
 struct alignas(16) TerrainDrawableUBO {
     /*  0 */ std::array<float, 4 * 4> matrix;
-    /* 64 */ std::array<float, 4> dem_coords; // scale, x offset, y offset into the bound DEM
-                                              // tile ({1,0,0,0} unless an ancestor is bound)
+    /* 64 */ std::array<float, 4> dem_coords;   // scale, x offset, y offset into the bound DEM
+                                                // tile ({1,0,0,0} unless an ancestor is bound)
     /* 80 */ std::array<float, 4> slope_params; // x = metres per tile unit (rock shading of steep
                                                 // ground); yzw reserved
     /* 96 */
@@ -17,8 +17,8 @@ static_assert(sizeof(TerrainDrawableUBO) == 6 * 16);
 
 // One entry per instance of the instanced GL terrain depth pass. The whole array is bound as
 // the TerrainDrawableUBO block and indexed by gl_InstanceID in terrain_depth.vertex. Kept
-// separate from TerrainDrawableUBO so the shared struct (and the mtl/vulkan/webgpu layouts
-// mirroring it) stay untouched. std140: mat4 then two vec4s -> 6*16 bytes.
+// separate from TerrainDrawableUBO, which carries slope_params that a depth instance has no
+// use for. std140: mat4 then two vec4s -> 6*16 bytes.
 struct alignas(16) TerrainDepthInstanceUBO {
     /*  0 */ std::array<float, 4 * 4> matrix;
     /* 64 */ std::array<float, 4> dem_coords; // scale, x offset, y offset, dem_dim (in .w)

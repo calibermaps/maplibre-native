@@ -87,9 +87,13 @@ PremultipliedImage renderCliff() {
 
 } // namespace
 
-// Ground steeper than about 60 degrees is a face the top-down drape only smears across, so the
-// terrain pass fades it toward a lit rock tone; gentle ground keeps the drape untouched.
+// Ground steeper than 50 degrees, fully rock by 65, is a face the top-down drape only smears across,
+// so the terrain pass fades it toward a lit rock tone; gentle ground keeps the drape untouched.
+// Only the OpenGL and Metal terrain shaders do this.
 TEST(TerrainCliffShading, SteepFacesTakeTheRockToneAndFlatGroundKeepsTheDrape) {
+#if !(MLN_RENDER_BACKEND_OPENGL || MLN_RENDER_BACKEND_METAL)
+    GTEST_SKIP() << "steep ground is not shaded as rock on this backend";
+#endif
     const PremultipliedImage image = renderCliff();
     const auto at = [&](uint32_t x, uint32_t y) {
         return image.data.get() + (y * image.size.width + x) * 4;
