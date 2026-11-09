@@ -11,7 +11,9 @@
 #include <mln/util/image.hpp>
 #include <mln/util/run_loop.hpp>
 
+#include <cstring>
 #include <memory>
+#include <optional>
 #include <string>
 
 using namespace mln;
@@ -60,9 +62,10 @@ public:
         map.setBounds(BoundOptions().withMaxPitch(85.0));
     }
 
-    PremultipliedImage render(float range, double pitch) {
+    // `range` unset leaves the haze at its default, as a map that never calls setTerrainHaze does.
+    PremultipliedImage render(std::optional<float> range, double pitch) {
         map.jumpTo(CameraOptions().withCenter(LatLng{46.0, 10.0}).withZoom(13.0).withPitch(pitch));
-        map.setTerrainHaze(Color::red(), range);
+        if (range) map.setTerrainHaze(Color::red(), *range);
         PremultipliedImage image;
         for (int i = 0; i < 4; ++i) {
             loop.runOnce();
@@ -160,4 +163,29 @@ TEST(TerrainHaze, NoHazeAtARangeOf1OrLess) {
     EXPECT_EQ(reddened(view.render(0.5f, 70.0)), 0);
     EXPECT_EQ(reddened(view.render(1.0f, 70.0)), 0);
     EXPECT_GT(reddened(view.render(1.5f, 70.0)), 1000);
+}
+
+// Haze is off by default: a map that never sets it renders exactly as one that sets a range of 0 or 1,
+// every pixel the drape's own green, and differs from one with the haze on. The last comparison is
+// what keeps this from passing when the haze does nothing.
+TEST(TerrainHaze, TheDefaultLeavesTheOutputUnchanged) {
+    HazeView view;
+    const PremultipliedImage unset = view.render(std::nullopt, 70.0);
+    const PremultipliedImage zero = view.render(0.0f, 70.0);
+    const PremultipliedImage one = view.render(1.0f, 70.0);
+    const PremultipliedImage on = view.render(2.0f, 70.0);
+
+    EXPECT_EQ(unset.size, zero.size);
+    EXPECT_EQ(std::memcmp(unset.data.get(), zero.data.get(), unset.bytes()), 0);
+    EXPECT_EQ(std::memcmp(unset.data.get(), one.data.get(), unset.bytes()), 0);
+    EXPECT_NE(std::memcmp(unset.data.get(), on.data.get(), unset.bytes()), 0);
+
+    int notDrape = 0;
+    for (uint32_t y = 0; y < 512; ++y) {
+        for (uint32_t x = 0; x < 512; ++x) {
+            const uint8_t* px = pixel(unset, x, y);
+            notDrape += (px[0] == 0 && px[1] == 200 && px[2] == 0 && px[3] == 255) ? 0 : 1;
+        }
+    }
+    EXPECT_EQ(notDrape, 0);
 }
