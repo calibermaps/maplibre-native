@@ -48,6 +48,10 @@ void TerrainLayerTweaker::execute(LayerGroupBase& layerGroup, const PaintParamet
     // (default 1.0 renders true-scale elevation)
     const float exaggeration = terrain->getExaggeration();
 
+    // Rock shading strength (the style's terrain rock-shading), carried in slope_params.y. 0, the
+    // default, switches the shader's rock shading and its extra elevation lookups off.
+    const float rockShading = terrain->getRockShading();
+
     // Skirt depth (u_ele_delta): the shader drops the mesh's skirt vertices by
     // this many metres into a curtain that hides the cracks between neighbouring
     // tiles at different zoom levels. ~1/5 of the tile's world width at this zoom,
@@ -127,7 +131,7 @@ void TerrainLayerTweaker::execute(LayerGroupBase& layerGroup, const PaintParamet
 #endif
             .matrix = util::cast<float>(matrix),
             .dem_coords = terrain->getDrawableDemCoords(*drawable.getTileID()),
-            .slope_params = {{metersPerTileUnit(*drawable.getTileID()), 0.0f, 0.0f, 0.0f}}
+            .slope_params = {{metersPerTileUnit(*drawable.getTileID()), rockShading, 0.0f, 0.0f}}
         };
 
 #if !MLN_UBO_CONSOLIDATION

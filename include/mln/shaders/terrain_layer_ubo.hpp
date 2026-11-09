@@ -9,8 +9,11 @@ struct alignas(16) TerrainDrawableUBO {
     /*  0 */ std::array<float, 4 * 4> matrix;
     /* 64 */ std::array<float, 4> dem_coords;   // scale, x offset, y offset into the bound DEM
                                                 // tile ({1,0,0,0} unless an ancestor is bound)
-    /* 80 */ std::array<float, 4> slope_params; // x = metres per tile unit (rock shading of steep
-                                                // ground); yzw reserved
+    /* 80 */ std::array<float, 4> slope_params; // rock shading of steep ground, optional and off by
+                                                // default: x = metres per tile unit, y = strength
+                                                // (0 = off, the style's terrain rock-shading); zw
+                                                // reserved. OpenGL and Metal read it, Vulkan and
+                                                // WebGPU carry it unused.
     /* 96 */
 };
 static_assert(sizeof(TerrainDrawableUBO) == 6 * 16);

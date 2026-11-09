@@ -266,6 +266,8 @@ public:
      * @brief Get the terrain exaggeration multiplier
      */
     float getExaggeration() const;
+    /// The style's terrain rock-shading clamped to 0 to 1; 0, the default, is off.
+    float getRockShading() const;
 
     /**
      * @brief The map's distance haze (Map::setTerrainHaze) as of the last update; range 0 is none

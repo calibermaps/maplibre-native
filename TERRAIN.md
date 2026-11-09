@@ -53,6 +53,8 @@ Terrain rendering enables draping the map over 3D elevation data from Digital El
   **Heatmap caveat:** kernels are elevated by their centre only, and the colour-ramp
   composite is still a screen-space pass that draws over everything.
 - **Exaggeration**: styled vertical exaggeration multiplier (1.0 = true scale)
+- **Rock shading** (optional, off by default): the `rock-shading` terrain property fades steep
+  ground toward lit rock on OpenGL and Metal; Vulkan and WebGPU ignore it. See below.
 - **Shared Elevation Function**: a `get_elevation()` helper in every backend's
   shader prelude
 
@@ -122,6 +124,35 @@ OpenFreeMap Liberty vector basemap (`TestStyles.OPENFREEMAP_LIBERTY`) that
 |----------|------|---------|-------------|
 | `source` | string | (required) | ID of a raster-dem source to use for terrain |
 | `exaggeration` | number | 1.0 | Vertical exaggeration multiplier for elevation |
+| `rock-shading` | number, 0 to 1 | 0 (off) | Optional. Strength of the steep-ground rock shading described below; 0 leaves the drape untouched |
+
+### Rock shading (optional, off by default)
+
+A top-down drape stretches into streaks across a cliff face. `"rock-shading": 1` fades ground
+steeper than about 50 degrees toward a lit gray rock tone, fully by 65 degrees, keeping about a third
+of the drape so lines and overlays crossing a face stay visible. Gentler ground is untouched. Values
+between 0 and 1 scale the fade.
+
+```json
+"terrain": {"source": "terrainSource", "rock-shading": 1}
+```
+
+It is a native-only property: it is not in the style specification, and maplibre-gl-js does not
+have it.
+
+- **Off by default.** A style that does not set `rock-shading` (or sets it to 0) renders exactly as
+  it did before the property existed, and the shader skips the four extra elevation lookups the
+  slope needs. A value above 1 counts as 1, a negative value or NaN as 0, and a value that is not a
+  number is a style error, as for `exaggeration`.
+- **OpenGL and Metal only.** Vulkan and WebGPU parse the property and ignore it: their terrain
+  shaders do not shade rock, so the same style looks different there than on OpenGL and Metal. The
+  shared uniform struct carries the strength in `slope_params.y` on every backend, so adding the
+  effect to those shaders later is a shader-only change.
+- The slope is measured from the exaggerated heights, so a higher `exaggeration` turns more ground
+  into rock.
+- It lives in the style's `Terrain` object next to `exaggeration`: loading a style reads it, and
+  changing it at runtime (`Terrain::setRockShading`) rebuilds the render terrain, as changing
+  `exaggeration` does.
 
 ### Sharing a source between terrain and hillshade
 
@@ -295,7 +326,8 @@ Implemented:
   heatmap, and fill-extrusion on all four backends, via the shared `get_elevation()`
   prelude helper and per-drawable DEM bindings
 - Style parsing of the `terrain` root property (`source`, `exaggeration`) per the
-  style spec, with exaggeration applied as styled (1.0 = true scale)
+  style spec, with exaggeration applied as styled (1.0 = true scale), plus the native-only,
+  optional `rock-shading` (off by default)
 - CPU elevation queries (`RenderTerrain::getElevation`) with DEM tile ancestor
   fallback and bilinear interpolation
 - Line antialiasing gamma handled per drawable (1.0 when draped into a terrain
