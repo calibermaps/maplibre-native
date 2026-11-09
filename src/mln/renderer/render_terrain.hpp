@@ -265,6 +265,8 @@ public:
      * @brief Get the terrain exaggeration multiplier
      */
     float getExaggeration() const;
+    /// The style's terrain rock-shading clamped to 0 to 1; 0, the default, is off.
+    float getRockShading() const;
 
     /**
      * @brief Get the source ID providing DEM data

@@ -1171,6 +1171,11 @@ float RenderTerrain::getExaggeration() const {
     return impl->exaggeration;
 }
 
+float RenderTerrain::getRockShading() const {
+    const float strength = impl->rockShading;
+    return strength > 0.0f ? std::min(strength, 1.0f) : 0.0f; // NaN and negatives are off
+}
+
 const std::string& RenderTerrain::getSourceID() const {
     return impl->sourceID;
 }

@@ -1,11 +1,12 @@
 out vec2 v_uv;
 out float v_elevation;
 out vec3 v_normal;
+out float v_rock_strength;
 
 layout (std140) uniform TerrainDrawableUBO {
     highp mat4 u_matrix;
     highp vec4 u_dem_tile_coords;
-    highp vec4 u_slope_params; // x = metres per tile unit
+    highp vec4 u_slope_params; // x = metres per tile unit, y = rock shading strength (0 = off)
 };
 
 layout (std140) uniform TerrainEvaluatedPropsUBO {
@@ -33,19 +34,25 @@ void main() {
     v_elevation = get_elevation(pos, u_dem, u_dem_tile_coords, u_unpack,
                                 u_dem_tile_coords.w, u_exaggeration, 1.0);
 
-    // Surface normal (x east, y south, z up) from central differences one DEM texel either side,
-    // in the same exaggerated metres the mesh is lifted by. The fragment stage turns steep
-    // ground into lit rock.
-    float texel = 1.0 / max(u_dem_tile_coords.x * u_dem_tile_coords.w, 1e-4);
-    float dx = get_elevation(pos + vec2(texel, 0.0), u_dem, u_dem_tile_coords, u_unpack,
-                             u_dem_tile_coords.w, u_exaggeration, 1.0) -
-               get_elevation(pos - vec2(texel, 0.0), u_dem, u_dem_tile_coords, u_unpack,
-                             u_dem_tile_coords.w, u_exaggeration, 1.0);
-    float dy = get_elevation(pos + vec2(0.0, texel), u_dem, u_dem_tile_coords, u_unpack,
-                             u_dem_tile_coords.w, u_exaggeration, 1.0) -
-               get_elevation(pos - vec2(0.0, texel), u_dem, u_dem_tile_coords, u_unpack,
-                             u_dem_tile_coords.w, u_exaggeration, 1.0);
-    v_normal = normalize(vec3(-dx, -dy, 2.0 * texel * u_slope_params.x));
+    // Rock shading is optional (the style's terrain rock-shading, off by default). Off, the surface
+    // is flat as far as the fragment stage can tell and the four extra elevation lookups are skipped.
+    // On, the surface normal (x east, y south, z up) comes from central differences one DEM texel
+    // either side, in the same exaggerated metres the mesh is lifted by, and the fragment stage turns
+    // steep ground into lit rock.
+    v_rock_strength = u_slope_params.y;
+    v_normal = vec3(0.0, 0.0, 1.0);
+    if (u_slope_params.y > 0.0) {
+        float texel = 1.0 / max(u_dem_tile_coords.x * u_dem_tile_coords.w, 1e-4);
+        float dx = get_elevation(pos + vec2(texel, 0.0), u_dem, u_dem_tile_coords, u_unpack,
+                                 u_dem_tile_coords.w, u_exaggeration, 1.0) -
+                   get_elevation(pos - vec2(texel, 0.0), u_dem, u_dem_tile_coords, u_unpack,
+                                 u_dem_tile_coords.w, u_exaggeration, 1.0);
+        float dy = get_elevation(pos + vec2(0.0, texel), u_dem, u_dem_tile_coords, u_unpack,
+                                 u_dem_tile_coords.w, u_exaggeration, 1.0) -
+                   get_elevation(pos - vec2(0.0, texel), u_dem, u_dem_tile_coords, u_unpack,
+                                 u_dem_tile_coords.w, u_exaggeration, 1.0);
+        v_normal = normalize(vec3(-dx, -dy, 2.0 * texel * u_slope_params.x));
+    }
 
     // Skirt vertices hang below the surface by u_elevation_offset, forming a
     // curtain that hides the cracks between neighbouring tiles at different zoom

@@ -17,8 +17,8 @@ Terrain::Terrain(Immutable<Terrain::Impl> impl_)
 Terrain::Terrain()
     : Terrain(makeMutable<Impl>()) {}
 
-Terrain::Terrain(const std::string& sourceID, float exaggeration)
-    : Terrain(makeMutable<Impl>(sourceID, exaggeration)) {}
+Terrain::Terrain(const std::string& sourceID, float exaggeration, float rockShading)
+    : Terrain(makeMutable<Impl>(sourceID, exaggeration, rockShading)) {}
 
 Terrain::~Terrain() = default;
 
@@ -48,6 +48,17 @@ float Terrain::getExaggeration() const {
 void Terrain::setExaggeration(float exaggeration) {
     auto impl_ = mutableImpl();
     impl_->exaggeration = exaggeration;
+    impl = std::move(impl_);
+    observer->onTerrainChanged(*this);
+}
+
+float Terrain::getRockShading() const {
+    return impl->rockShading;
+}
+
+void Terrain::setRockShading(float rockShading) {
+    auto impl_ = mutableImpl();
+    impl_->rockShading = rockShading;
     impl = std::move(impl_);
     observer->onTerrainChanged(*this);
 }

@@ -19,7 +19,7 @@ enum {
 struct alignas(16) TerrainDrawableUBO {
     /*  0 */ float4x4 matrix;
     /* 64 */ float4 dem_coords;
-    /* 80 */ float4 slope_params; // x = metres per tile unit
+    /* 80 */ float4 slope_params; // x = metres per tile unit, y = rock shading strength (0 = off)
     /* 96 */
 };
 static_assert(sizeof(TerrainDrawableUBO) == 6 * 16, "wrong size");
@@ -67,6 +67,7 @@ struct FragmentStage {
     float2 uv;
     float elevation;
     float3 normal;
+    float rock_strength;
 };
 
 FragmentStage vertex vertexMain(thread const VertexStage vertx [[stage_in]],
@@ -90,19 +91,24 @@ FragmentStage vertex vertexMain(thread const VertexStage vertx [[stage_in]],
     float elevation = get_elevation(pos, demTexture, demSampler, drawable.dem_coords, props.unpack,
                                     drawable.dem_coords.w, props.exaggeration, 1.0);
 
-    // Surface normal (x east, y south, z up) from central differences one DEM texel either side,
-    // in the same exaggerated metres the mesh is lifted by. The fragment stage turns steep
-    // ground into lit rock.
-    const float texel = 1.0 / max(drawable.dem_coords.x * drawable.dem_coords.w, 1e-4);
-    const float dx = get_elevation(pos + float2(texel, 0.0), demTexture, demSampler, drawable.dem_coords,
-                                   props.unpack, drawable.dem_coords.w, props.exaggeration, 1.0) -
-                     get_elevation(pos - float2(texel, 0.0), demTexture, demSampler, drawable.dem_coords,
-                                   props.unpack, drawable.dem_coords.w, props.exaggeration, 1.0);
-    const float dy = get_elevation(pos + float2(0.0, texel), demTexture, demSampler, drawable.dem_coords,
-                                   props.unpack, drawable.dem_coords.w, props.exaggeration, 1.0) -
-                     get_elevation(pos - float2(0.0, texel), demTexture, demSampler, drawable.dem_coords,
-                                   props.unpack, drawable.dem_coords.w, props.exaggeration, 1.0);
-    const float3 normal = normalize(float3(-dx, -dy, 2.0 * texel * drawable.slope_params.x));
+    // Rock shading is optional (the style's terrain rock-shading, off by default). Off, the surface
+    // is flat as far as the fragment stage can tell and the four extra elevation lookups are skipped.
+    // On, the surface normal (x east, y south, z up) comes from central differences one DEM texel
+    // either side, in the same exaggerated metres the mesh is lifted by, and the fragment stage turns
+    // steep ground into lit rock.
+    float3 normal = float3(0.0, 0.0, 1.0);
+    if (drawable.slope_params.y > 0.0) {
+        const float texel = 1.0 / max(drawable.dem_coords.x * drawable.dem_coords.w, 1e-4);
+        const float dx = get_elevation(pos + float2(texel, 0.0), demTexture, demSampler, drawable.dem_coords,
+                                       props.unpack, drawable.dem_coords.w, props.exaggeration, 1.0) -
+                         get_elevation(pos - float2(texel, 0.0), demTexture, demSampler, drawable.dem_coords,
+                                       props.unpack, drawable.dem_coords.w, props.exaggeration, 1.0);
+        const float dy = get_elevation(pos + float2(0.0, texel), demTexture, demSampler, drawable.dem_coords,
+                                       props.unpack, drawable.dem_coords.w, props.exaggeration, 1.0) -
+                         get_elevation(pos - float2(0.0, texel), demTexture, demSampler, drawable.dem_coords,
+                                       props.unpack, drawable.dem_coords.w, props.exaggeration, 1.0);
+        normal = normalize(float3(-dx, -dy, 2.0 * texel * drawable.slope_params.x));
+    }
 
     // Skirt vertices hang below the surface by elevation_offset, forming a curtain
     // that hides the cracks between neighbouring tiles at different zoom levels
@@ -115,6 +121,7 @@ FragmentStage vertex vertexMain(thread const VertexStage vertx [[stage_in]],
         .uv        = uv,
         .elevation = elevation,
         .normal    = normal,
+        .rock_strength = drawable.slope_params.y,
     };
 }
 
@@ -134,11 +141,12 @@ half4 fragment fragmentMain(FragmentStage in [[stage_in]],
     // swapped about the view). Sample uv.y directly on Metal.
     float4 color = mapTexture.sample(mapSampler, float2(in.uv.x, in.uv.y));
 
-    // Ground steeper than about 50 degrees stretches the top-down drape into streaks. Fade it
-    // toward lit rock (full by 65 degrees), keeping about a third of the drape so lines and
-    // overlays crossing a face stay visible. Gentler ground takes no part of this.
+    // Optional, off by default (rock_strength is the style's terrain rock-shading, 0 to 1; 0 leaves
+    // the drape untouched). Ground steeper than about 50 degrees stretches the top-down drape into
+    // streaks. Fade it toward lit rock (full by 65 degrees), keeping about a third of the drape so
+    // lines and overlays crossing a face stay visible. Gentler ground takes no part of this.
     const float3 n = normalize(in.normal);
-    const float rock = 1.0 - smoothstep(0.4226, 0.6428, n.z); // cos 65, cos 50 degrees
+    const float rock = (1.0 - smoothstep(0.4226, 0.6428, n.z)) * in.rock_strength; // cos 65, cos 50 degrees
     if (rock > 0.0) {
         const float shade = 0.55 + 0.6 * max(dot(n, float3(-0.5, -0.5, 0.7071)), 0.0); // sun from the north-west
         const float3 lit = mix(float3(0.54), color.rgb, 0.35) * shade * color.a;

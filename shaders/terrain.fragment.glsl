@@ -1,6 +1,7 @@
 in vec2 v_uv;
 in float v_elevation;
 in vec3 v_normal;
+in float v_rock_strength;
 
 uniform sampler2D u_map;
 
@@ -9,11 +10,12 @@ void main() {
     // Note: Y-coordinate is flipped (1.0 - y) to match OpenGL convention
     fragColor = texture(u_map, vec2(v_uv.x, 1.0 - v_uv.y));
 
-    // Ground steeper than about 50 degrees stretches the top-down drape into streaks. Fade it
-    // toward lit rock (full by 65 degrees), keeping about a third of the drape so lines and
-    // overlays crossing a face stay visible. Gentler ground takes no part of this.
+    // Optional, off by default (v_rock_strength is the style's terrain rock-shading, 0 to 1; 0 leaves
+    // the drape untouched). Ground steeper than about 50 degrees stretches the top-down drape into
+    // streaks. Fade it toward lit rock (full by 65 degrees), keeping about a third of the drape so
+    // lines and overlays crossing a face stay visible. Gentler ground takes no part of this.
     vec3 n = normalize(v_normal);
-    float rock = 1.0 - smoothstep(0.4226, 0.6428, n.z); // cos 65, cos 50 degrees
+    float rock = (1.0 - smoothstep(0.4226, 0.6428, n.z)) * v_rock_strength; // cos 65, cos 50 degrees
     if (rock > 0.0) {
         float shade = 0.55 + 0.6 * max(dot(n, vec3(-0.5, -0.5, 0.7071)), 0.0); // sun from the north-west
         vec3 lit = mix(vec3(0.54), fragColor.rgb, 0.35) * shade * fragColor.a;

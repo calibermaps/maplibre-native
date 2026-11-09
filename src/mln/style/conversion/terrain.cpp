@@ -37,7 +37,20 @@ std::optional<Terrain> Converter<Terrain>::operator()(const Convertible& value, 
         exaggeration = *converted;
     }
 
-    return Terrain(*source, exaggeration);
+    // Parse rock-shading (optional, default: 0, off). Like exaggeration, anything but a number is an
+    // error and a number is taken as given; the renderer clamps it to 0 to 1.
+    float rockShading = 0.0f;
+    std::optional<Convertible> rockShadingValue = objectMember(value, "rock-shading");
+    if (rockShadingValue) {
+        std::optional<float> converted = toNumber(*rockShadingValue);
+        if (!converted) {
+            error.message = "terrain rock-shading must be a number";
+            return std::nullopt;
+        }
+        rockShading = *converted;
+    }
+
+    return Terrain(*source, exaggeration, rockShading);
 }
 
 } // namespace conversion
