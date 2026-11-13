@@ -174,8 +174,9 @@ TEST(TerrainDrape, CrossingALevelMatchesFreshTerrainDrawables) {
     // True once the frame has stayed the same for a second and a half and the map has said it is idle;
     // false if a minute passes first. A frame that merely stopped changing, with tiles still on the
     // way, does not count.
+    // The idle flag is cleared before each change, not here: a change can finish within the pump
+    // after it, and the map does not say it is idle again until something else changes.
     const auto settle = [&] {
-        idle = false;
         const auto start = std::chrono::steady_clock::now();
         pump(std::chrono::milliseconds(500)); // a frame is drawn before the first read (Vulkan asserts on none)
         PremultipliedImage last = read();
@@ -191,8 +192,10 @@ TEST(TerrainDrape, CrossingALevelMatchesFreshTerrainDrawables) {
         return false;
     };
 
+    idle = false;
     map.jumpTo(viewAt(14.5));
     ASSERT_TRUE(settle());
+    idle = false;
     map.easeTo(viewAt(15.1), AnimationOptions(Milliseconds(1000)));
     pump(std::chrono::milliseconds(1500));
     ASSERT_TRUE(settle());
@@ -214,6 +217,7 @@ TEST(TerrainDrape, CrossingALevelMatchesFreshTerrainDrawables) {
 
     // An exaggeration of 1.0001 instead of 1 shows nothing but makes the renderer replace its
     // RenderTerrain: new terrain drawables, on the drape targets the map already has.
+    idle = false;
     map.getStyle().setTerrain(std::make_unique<style::Terrain>("dem", 1.0001f));
     ASSERT_TRUE(settle());
     const PremultipliedImage rebuilt = read();
