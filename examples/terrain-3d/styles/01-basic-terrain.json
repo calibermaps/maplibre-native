@@ -1,0 +1,42 @@
+{
+  "version": 8,
+  "name": "Basic terrain",
+  "metadata": {
+    "description": "OpenStreetMap raster tiles draped over Mapterhorn elevation, vertical exaggeration 2. Innsbruck and the Nordkette.",
+    "license": "Written for the MapLibre Native terrain examples. Data credits are in each source attribution."
+  },
+  "center": [
+    -119.58,
+    37.738
+  ],
+  "zoom": 12.3,
+  "pitch": 62,
+  "bearing": 95,
+  "sources": {
+    "osm": {
+      "type": "raster",
+      "tiles": [
+        "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+      ],
+      "tileSize": 256,
+      "maxzoom": 19,
+      "attribution": "&copy; <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors"
+    },
+    "dem": {
+      "type": "raster-dem",
+      "url": "https://tiles.mapterhorn.com/tilejson.json",
+      "attribution": "<a href='https://mapterhorn.com/attribution'>&copy; Mapterhorn</a>"
+    }
+  },
+  "terrain": {
+    "source": "dem",
+    "exaggeration": 2.0
+  },
+  "layers": [
+    {
+      "id": "osm",
+      "type": "raster",
+      "source": "osm"
+    }
+  ]
+}

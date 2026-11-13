@@ -1,0 +1,403 @@
+{
+  "version": 8,
+  "name": "Symbols on terrain",
+  "metadata": {
+    "description": "Peak, hut and place labels with sprite icons stand on the ground and fade out behind ridges. Matterhorn and Monte Rosa. Positions are approximate.",
+    "license": "Written for the MapLibre Native terrain examples. Data credits are in each source attribution."
+  },
+  "center": [
+    7.75,
+    46.0
+  ],
+  "zoom": 12.4,
+  "pitch": 72,
+  "bearing": 235,
+  "sources": {
+    "dem": {
+      "type": "raster-dem",
+      "url": "https://tiles.mapterhorn.com/tilejson.json",
+      "attribution": "<a href='https://mapterhorn.com/attribution'>&copy; Mapterhorn</a>"
+    },
+    "points": {
+      "type": "geojson",
+      "data": {
+        "type": "FeatureCollection",
+        "features": [
+          {
+            "type": "Feature",
+            "properties": {
+              "name": "Matterhorn",
+              "kind": "peak",
+              "label": "Matterhorn\n4478 m"
+            },
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                7.6586,
+                45.9763
+              ]
+            }
+          },
+          {
+            "type": "Feature",
+            "properties": {
+              "name": "Breithorn",
+              "kind": "peak",
+              "label": "Breithorn\n4164 m"
+            },
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                7.7453,
+                45.9406
+              ]
+            }
+          },
+          {
+            "type": "Feature",
+            "properties": {
+              "name": "Weisshorn",
+              "kind": "peak",
+              "label": "Weisshorn\n4506 m"
+            },
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                7.716,
+                46.1016
+              ]
+            }
+          },
+          {
+            "type": "Feature",
+            "properties": {
+              "name": "Dent Blanche",
+              "kind": "peak",
+              "label": "Dent Blanche\n4357 m"
+            },
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                7.6125,
+                46.0342
+              ]
+            }
+          },
+          {
+            "type": "Feature",
+            "properties": {
+              "name": "Dufourspitze",
+              "kind": "peak",
+              "label": "Dufourspitze\n4634 m"
+            },
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                7.8668,
+                45.9369
+              ]
+            }
+          },
+          {
+            "type": "Feature",
+            "properties": {
+              "name": "Gornergrat",
+              "kind": "peak",
+              "label": "Gornergrat\n3135 m"
+            },
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                7.7847,
+                45.9835
+              ]
+            }
+          },
+          {
+            "type": "Feature",
+            "properties": {
+              "name": "Rimpfischhorn",
+              "kind": "peak",
+              "label": "Rimpfischhorn\n4199 m"
+            },
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                7.8847,
+                46.0228
+              ]
+            }
+          },
+          {
+            "type": "Feature",
+            "properties": {
+              "name": "Ober Gabelhorn",
+              "kind": "peak",
+              "label": "Ober Gabelhorn\n4063 m"
+            },
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                7.677,
+                46.068
+              ]
+            }
+          },
+          {
+            "type": "Feature",
+            "properties": {
+              "name": "Hornli Hut",
+              "kind": "hut",
+              "label": "Hornli Hut"
+            },
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                7.6703,
+                45.9843
+              ]
+            }
+          },
+          {
+            "type": "Feature",
+            "properties": {
+              "name": "Monte Rosa Hut",
+              "kind": "hut",
+              "label": "Monte Rosa Hut"
+            },
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                7.8105,
+                45.923
+              ]
+            }
+          },
+          {
+            "type": "Feature",
+            "properties": {
+              "name": "Fluhalp",
+              "kind": "hut",
+              "label": "Fluhalp"
+            },
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                7.733,
+                45.984
+              ]
+            }
+          },
+          {
+            "type": "Feature",
+            "properties": {
+              "name": "Zermatt",
+              "kind": "town",
+              "label": "Zermatt"
+            },
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                7.7491,
+                46.0207
+              ]
+            }
+          },
+          {
+            "type": "Feature",
+            "properties": {
+              "name": "Findeln",
+              "kind": "town",
+              "label": "Findeln"
+            },
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                7.779,
+                46.005
+              ]
+            }
+          },
+          {
+            "type": "Feature",
+            "properties": {
+              "name": "Zmutt",
+              "kind": "town",
+              "label": "Zmutt"
+            },
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                7.693,
+                46.0
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "sprite": "https://tiles.openfreemap.org/sprites/ofm_f384/ofm",
+  "glyphs": "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
+  "terrain": {
+    "source": "dem",
+    "exaggeration": 1.4
+  },
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "#e6ebe2"
+      }
+    },
+    {
+      "id": "color-relief",
+      "type": "color-relief",
+      "source": "dem",
+      "paint": {
+        "color-relief-color": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "elevation"
+          ],
+          1000,
+          "#9db88a",
+          1800,
+          "#c8c38a",
+          2600,
+          "#b9a58d",
+          3400,
+          "#d5d0cd",
+          4000,
+          "#f3f3f6"
+        ],
+        "color-relief-opacity": 1
+      }
+    },
+    {
+      "id": "hillshade",
+      "type": "hillshade",
+      "source": "dem",
+      "paint": {
+        "hillshade-exaggeration": 0.45,
+        "hillshade-shadow-color": "#2a2f45"
+      }
+    },
+    {
+      "id": "peaks",
+      "type": "symbol",
+      "source": "points",
+      "filter": [
+        "==",
+        [
+          "get",
+          "kind"
+        ],
+        "peak"
+      ],
+      "layout": {
+        "icon-image": "mountain",
+        "icon-size": 1.5,
+        "text-field": [
+          "get",
+          "label"
+        ],
+        "text-font": [
+          "Noto Sans Bold"
+        ],
+        "text-size": 15,
+        "text-anchor": "top",
+        "text-offset": [
+          0,
+          0.9
+        ],
+        "text-max-width": 9,
+        "icon-allow-overlap": true,
+        "text-allow-overlap": true
+      },
+      "paint": {
+        "text-color": "#1d2433",
+        "text-halo-color": "rgba(255,255,255,0.95)",
+        "text-halo-width": 2
+      }
+    },
+    {
+      "id": "huts",
+      "type": "symbol",
+      "source": "points",
+      "filter": [
+        "==",
+        [
+          "get",
+          "kind"
+        ],
+        "hut"
+      ],
+      "layout": {
+        "icon-image": "lodging",
+        "icon-size": 1.4,
+        "text-field": [
+          "get",
+          "label"
+        ],
+        "text-font": [
+          "Noto Sans Regular"
+        ],
+        "text-size": 13,
+        "text-anchor": "top",
+        "text-offset": [
+          0,
+          0.9
+        ],
+        "icon-allow-overlap": true,
+        "text-allow-overlap": true
+      },
+      "paint": {
+        "text-color": "#5a2d12",
+        "text-halo-color": "rgba(255,255,255,0.95)",
+        "text-halo-width": 1.8
+      }
+    },
+    {
+      "id": "towns",
+      "type": "symbol",
+      "source": "points",
+      "filter": [
+        "==",
+        [
+          "get",
+          "kind"
+        ],
+        "town"
+      ],
+      "layout": {
+        "icon-image": "circle_stroked",
+        "icon-size": 1.2,
+        "text-field": [
+          "get",
+          "label"
+        ],
+        "text-font": [
+          "Noto Sans Bold"
+        ],
+        "text-size": 17,
+        "text-anchor": "top",
+        "text-offset": [
+          0,
+          0.8
+        ],
+        "icon-allow-overlap": true,
+        "text-allow-overlap": true
+      },
+      "paint": {
+        "text-color": "#0d3b66",
+        "text-halo-color": "rgba(255,255,255,0.95)",
+        "text-halo-width": 2
+      }
+    }
+  ]
+}

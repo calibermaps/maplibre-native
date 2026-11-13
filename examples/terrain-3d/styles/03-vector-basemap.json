@@ -1,0 +1,414 @@
+{
+  "version": 8,
+  "name": "Vector basemap draped",
+  "metadata": {
+    "description": "A full OpenMapTiles vector basemap (landcover, water, roads, flat buildings, place labels) draped over terrain. Zermatt.",
+    "license": "Written for the MapLibre Native terrain examples. Data credits are in each source attribution."
+  },
+  "center": [
+    7.7491,
+    46.0207
+  ],
+  "zoom": 13.6,
+  "pitch": 62,
+  "bearing": 225,
+  "sources": {
+    "ofm": {
+      "type": "vector",
+      "url": "https://tiles.openfreemap.org/planet",
+      "attribution": "<a href='https://openfreemap.org'>OpenFreeMap</a> <a href='https://www.openmaptiles.org/'>&copy; OpenMapTiles</a> Data from <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a>"
+    },
+    "dem": {
+      "type": "raster-dem",
+      "url": "https://tiles.mapterhorn.com/tilejson.json",
+      "attribution": "<a href='https://mapterhorn.com/attribution'>&copy; Mapterhorn</a>"
+    }
+  },
+  "glyphs": "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
+  "terrain": {
+    "source": "dem",
+    "exaggeration": 1.4
+  },
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "#e9ecdf"
+      }
+    },
+    {
+      "id": "landcover",
+      "type": "fill",
+      "source": "ofm",
+      "source-layer": "landcover",
+      "paint": {
+        "fill-color": [
+          "match",
+          [
+            "get",
+            "class"
+          ],
+          "wood",
+          "#b5cfa0",
+          "grass",
+          "#cfe0b4",
+          "farmland",
+          "#e3e6bd",
+          "wetland",
+          "#bcd8c4",
+          "rock",
+          "#d4cfc6",
+          "sand",
+          "#eadfb9",
+          "ice",
+          "#f4f9fc",
+          "#dfe6cf"
+        ],
+        "fill-opacity": 0.9
+      }
+    },
+    {
+      "id": "park",
+      "type": "fill",
+      "source": "ofm",
+      "source-layer": "park",
+      "paint": {
+        "fill-color": "#c6dfae",
+        "fill-opacity": 0.45
+      }
+    },
+    {
+      "id": "landuse",
+      "type": "fill",
+      "source": "ofm",
+      "source-layer": "landuse",
+      "filter": [
+        "in",
+        [
+          "get",
+          "class"
+        ],
+        [
+          "literal",
+          [
+            "residential",
+            "commercial",
+            "industrial",
+            "retail",
+            "cemetery",
+            "pitch"
+          ]
+        ]
+      ],
+      "paint": {
+        "fill-color": [
+          "match",
+          [
+            "get",
+            "class"
+          ],
+          "residential",
+          "#e4e0d6",
+          "cemetery",
+          "#cbd9c0",
+          "pitch",
+          "#c9dfc0",
+          "#dcd8cf"
+        ],
+        "fill-opacity": 0.8
+      }
+    },
+    {
+      "id": "water",
+      "type": "fill",
+      "source": "ofm",
+      "source-layer": "water",
+      "paint": {
+        "fill-color": "#9cc4dd"
+      }
+    },
+    {
+      "id": "hillshade",
+      "type": "hillshade",
+      "source": "dem",
+      "paint": {
+        "hillshade-exaggeration": 0.3,
+        "hillshade-shadow-color": "#2a2f45",
+        "hillshade-highlight-color": "#ffffff"
+      }
+    },
+    {
+      "id": "waterway",
+      "type": "line",
+      "source": "ofm",
+      "source-layer": "waterway",
+      "paint": {
+        "line-color": "#8bb8d4",
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          8,
+          0.6,
+          14,
+          2.4
+        ]
+      }
+    },
+    {
+      "id": "road-casing",
+      "type": "line",
+      "source": "ofm",
+      "source-layer": "transportation",
+      "minzoom": 9,
+      "filter": [
+        "all",
+        [
+          "in",
+          [
+            "get",
+            "class"
+          ],
+          [
+            "literal",
+            [
+              "motorway",
+              "trunk",
+              "primary",
+              "secondary",
+              "tertiary",
+              "minor",
+              "service"
+            ]
+          ]
+        ],
+        [
+          "!=",
+          [
+            "get",
+            "brunnel"
+          ],
+          "tunnel"
+        ]
+      ],
+      "layout": {
+        "line-cap": "round",
+        "line-join": "round"
+      },
+      "paint": {
+        "line-color": "#a79f93",
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          9,
+          0.8,
+          12,
+          2.4,
+          15,
+          7,
+          17,
+          15
+        ]
+      }
+    },
+    {
+      "id": "road",
+      "type": "line",
+      "source": "ofm",
+      "source-layer": "transportation",
+      "minzoom": 9,
+      "filter": [
+        "all",
+        [
+          "in",
+          [
+            "get",
+            "class"
+          ],
+          [
+            "literal",
+            [
+              "motorway",
+              "trunk",
+              "primary",
+              "secondary",
+              "tertiary",
+              "minor",
+              "service"
+            ]
+          ]
+        ],
+        [
+          "!=",
+          [
+            "get",
+            "brunnel"
+          ],
+          "tunnel"
+        ]
+      ],
+      "layout": {
+        "line-cap": "round",
+        "line-join": "round"
+      },
+      "paint": {
+        "line-color": [
+          "match",
+          [
+            "get",
+            "class"
+          ],
+          "motorway",
+          "#f2b36b",
+          "trunk",
+          "#f4c581",
+          "primary",
+          "#f7d99a",
+          "#fffdf6"
+        ],
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          8,
+          0.5,
+          12,
+          1.6,
+          15,
+          5,
+          17,
+          12
+        ]
+      }
+    },
+    {
+      "id": "path",
+      "type": "line",
+      "source": "ofm",
+      "source-layer": "transportation",
+      "minzoom": 12,
+      "filter": [
+        "in",
+        [
+          "get",
+          "class"
+        ],
+        [
+          "literal",
+          [
+            "path",
+            "track"
+          ]
+        ]
+      ],
+      "layout": {
+        "line-cap": "round"
+      },
+      "paint": {
+        "line-color": "#9b6b4a",
+        "line-dasharray": [
+          2,
+          1.5
+        ],
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          12,
+          0.6,
+          16,
+          1.8
+        ]
+      }
+    },
+    {
+      "id": "building-flat",
+      "type": "fill",
+      "source": "ofm",
+      "source-layer": "building",
+      "minzoom": 13,
+      "paint": {
+        "fill-color": "#cbb8a2",
+        "fill-outline-color": "#a99682",
+        "fill-opacity": 0.95
+      }
+    },
+    {
+      "id": "place-label",
+      "type": "symbol",
+      "source": "ofm",
+      "source-layer": "place",
+      "filter": [
+        "in",
+        [
+          "get",
+          "class"
+        ],
+        [
+          "literal",
+          [
+            "city",
+            "town",
+            "village",
+            "suburb",
+            "hamlet"
+          ]
+        ]
+      ],
+      "layout": {
+        "text-field": [
+          "coalesce",
+          [
+            "get",
+            "name_en"
+          ],
+          [
+            "get",
+            "name"
+          ]
+        ],
+        "text-font": [
+          "Noto Sans Regular"
+        ],
+        "text-size": [
+          "match",
+          [
+            "get",
+            "class"
+          ],
+          "city",
+          20,
+          "town",
+          17,
+          "village",
+          15,
+          13
+        ],
+        "text-max-width": 8
+      },
+      "paint": {
+        "text-color": "#2b2b2b",
+        "text-halo-color": "rgba(255,255,255,0.9)",
+        "text-halo-width": 1.6
+      }
+    }
+  ]
+}

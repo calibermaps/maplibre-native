@@ -1,0 +1,11 @@
+# Camera stops for ./tour.sh, on Mount Rainier. Columns: lon lat zoom pitch bearing
+# The script interpolates between stops, looks up the ground height at every center and
+# refuses to finish if the camera would come within 120 m of the terrain.
+# mbgl-render limits pitch to 60 degrees.
+-121.7603 46.8523 10.0  0   0
+-121.7603 46.8523 10.8 30  60
+-121.7500 46.8300 11.5 50 120
+-121.7350 46.8000 12.2 60 170
+-121.7550 46.8250 12.4 60 250
+-121.7650 46.8450 11.8 58 330
+-121.7603 46.8523 11.0 40 360

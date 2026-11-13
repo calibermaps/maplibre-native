@@ -1,0 +1,82 @@
+{
+  "version": 8,
+  "name": "Hillshade and color-relief",
+  "metadata": {
+    "description": "One raster-dem source drives the terrain mesh, a color-relief layer and a hillshade layer. Mount Rainier.",
+    "license": "Written for the MapLibre Native terrain examples. Data credits are in each source attribution."
+  },
+  "center": [
+    -121.7603,
+    46.8523
+  ],
+  "zoom": 11.2,
+  "pitch": 62,
+  "bearing": 25,
+  "sources": {
+    "dem": {
+      "type": "raster-dem",
+      "url": "https://tiles.mapterhorn.com/tilejson.json",
+      "attribution": "<a href='https://mapterhorn.com/attribution'>&copy; Mapterhorn</a>"
+    }
+  },
+  "terrain": {
+    "source": "dem",
+    "exaggeration": 1.3
+  },
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "#dfe6dc"
+      }
+    },
+    {
+      "id": "color-relief",
+      "type": "color-relief",
+      "source": "dem",
+      "paint": {
+        "color-relief-color": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "elevation"
+          ],
+          400,
+          "#3f6b3a",
+          900,
+          "#6f8f45",
+          1400,
+          "#a3a85a",
+          1900,
+          "#c9b36b",
+          2400,
+          "#b08d63",
+          3000,
+          "#9a8577",
+          3600,
+          "#c9c3c0",
+          4200,
+          "#f3f3f5",
+          4500,
+          "#ffffff"
+        ],
+        "color-relief-opacity": 1
+      }
+    },
+    {
+      "id": "hillshade",
+      "type": "hillshade",
+      "source": "dem",
+      "paint": {
+        "hillshade-exaggeration": 0.65,
+        "hillshade-shadow-color": "#2a2f45",
+        "hillshade-highlight-color": "#ffffff",
+        "hillshade-accent-color": "#3b3f55",
+        "hillshade-illumination-direction": 315
+      }
+    }
+  ]
+}

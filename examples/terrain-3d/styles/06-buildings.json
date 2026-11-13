@@ -1,0 +1,380 @@
+{
+  "version": 8,
+  "name": "Buildings on relief",
+  "metadata": {
+    "description": "Fill-extrusion buildings from OpenMapTiles raised onto the terrain. Innsbruck below the Nordkette. Needs the OpenGL or WebGPU renderer.",
+    "license": "Written for the MapLibre Native terrain examples. Data credits are in each source attribution."
+  },
+  "center": [
+    11.4041,
+    47.2692
+  ],
+  "zoom": 15.2,
+  "pitch": 60,
+  "bearing": 15,
+  "sources": {
+    "ofm": {
+      "type": "vector",
+      "url": "https://tiles.openfreemap.org/planet",
+      "attribution": "<a href='https://openfreemap.org'>OpenFreeMap</a> <a href='https://www.openmaptiles.org/'>&copy; OpenMapTiles</a> Data from <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a>"
+    },
+    "dem": {
+      "type": "raster-dem",
+      "url": "https://tiles.mapterhorn.com/tilejson.json",
+      "attribution": "<a href='https://mapterhorn.com/attribution'>&copy; Mapterhorn</a>"
+    }
+  },
+  "glyphs": "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
+  "terrain": {
+    "source": "dem",
+    "exaggeration": 1.5
+  },
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "#e9ecdf"
+      }
+    },
+    {
+      "id": "landcover",
+      "type": "fill",
+      "source": "ofm",
+      "source-layer": "landcover",
+      "paint": {
+        "fill-color": [
+          "match",
+          [
+            "get",
+            "class"
+          ],
+          "wood",
+          "#b5cfa0",
+          "grass",
+          "#cfe0b4",
+          "farmland",
+          "#e3e6bd",
+          "wetland",
+          "#bcd8c4",
+          "rock",
+          "#d4cfc6",
+          "sand",
+          "#eadfb9",
+          "ice",
+          "#f4f9fc",
+          "#dfe6cf"
+        ],
+        "fill-opacity": 0.9
+      }
+    },
+    {
+      "id": "park",
+      "type": "fill",
+      "source": "ofm",
+      "source-layer": "park",
+      "paint": {
+        "fill-color": "#c6dfae",
+        "fill-opacity": 0.45
+      }
+    },
+    {
+      "id": "landuse",
+      "type": "fill",
+      "source": "ofm",
+      "source-layer": "landuse",
+      "filter": [
+        "in",
+        [
+          "get",
+          "class"
+        ],
+        [
+          "literal",
+          [
+            "residential",
+            "commercial",
+            "industrial",
+            "retail",
+            "cemetery",
+            "pitch"
+          ]
+        ]
+      ],
+      "paint": {
+        "fill-color": [
+          "match",
+          [
+            "get",
+            "class"
+          ],
+          "residential",
+          "#e4e0d6",
+          "cemetery",
+          "#cbd9c0",
+          "pitch",
+          "#c9dfc0",
+          "#dcd8cf"
+        ],
+        "fill-opacity": 0.8
+      }
+    },
+    {
+      "id": "water",
+      "type": "fill",
+      "source": "ofm",
+      "source-layer": "water",
+      "paint": {
+        "fill-color": "#9cc4dd"
+      }
+    },
+    {
+      "id": "waterway",
+      "type": "line",
+      "source": "ofm",
+      "source-layer": "waterway",
+      "paint": {
+        "line-color": "#8bb8d4",
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          8,
+          0.6,
+          14,
+          2.4
+        ]
+      }
+    },
+    {
+      "id": "road-casing",
+      "type": "line",
+      "source": "ofm",
+      "source-layer": "transportation",
+      "minzoom": 9,
+      "filter": [
+        "all",
+        [
+          "in",
+          [
+            "get",
+            "class"
+          ],
+          [
+            "literal",
+            [
+              "motorway",
+              "trunk",
+              "primary",
+              "secondary",
+              "tertiary",
+              "minor",
+              "service"
+            ]
+          ]
+        ],
+        [
+          "!=",
+          [
+            "get",
+            "brunnel"
+          ],
+          "tunnel"
+        ]
+      ],
+      "layout": {
+        "line-cap": "round",
+        "line-join": "round"
+      },
+      "paint": {
+        "line-color": "#a79f93",
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          9,
+          0.8,
+          12,
+          2.4,
+          15,
+          7,
+          17,
+          15
+        ]
+      }
+    },
+    {
+      "id": "road",
+      "type": "line",
+      "source": "ofm",
+      "source-layer": "transportation",
+      "minzoom": 9,
+      "filter": [
+        "all",
+        [
+          "in",
+          [
+            "get",
+            "class"
+          ],
+          [
+            "literal",
+            [
+              "motorway",
+              "trunk",
+              "primary",
+              "secondary",
+              "tertiary",
+              "minor",
+              "service"
+            ]
+          ]
+        ],
+        [
+          "!=",
+          [
+            "get",
+            "brunnel"
+          ],
+          "tunnel"
+        ]
+      ],
+      "layout": {
+        "line-cap": "round",
+        "line-join": "round"
+      },
+      "paint": {
+        "line-color": [
+          "match",
+          [
+            "get",
+            "class"
+          ],
+          "motorway",
+          "#f2b36b",
+          "trunk",
+          "#f4c581",
+          "primary",
+          "#f7d99a",
+          "#fffdf6"
+        ],
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          8,
+          0.5,
+          12,
+          1.6,
+          15,
+          5,
+          17,
+          12
+        ]
+      }
+    },
+    {
+      "id": "path",
+      "type": "line",
+      "source": "ofm",
+      "source-layer": "transportation",
+      "minzoom": 12,
+      "filter": [
+        "in",
+        [
+          "get",
+          "class"
+        ],
+        [
+          "literal",
+          [
+            "path",
+            "track"
+          ]
+        ]
+      ],
+      "layout": {
+        "line-cap": "round"
+      },
+      "paint": {
+        "line-color": "#9b6b4a",
+        "line-dasharray": [
+          2,
+          1.5
+        ],
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          12,
+          0.6,
+          16,
+          1.8
+        ]
+      }
+    },
+    {
+      "id": "buildings",
+      "type": "fill-extrusion",
+      "source": "ofm",
+      "source-layer": "building",
+      "minzoom": 13,
+      "paint": {
+        "fill-extrusion-color": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "coalesce",
+            [
+              "get",
+              "render_height"
+            ],
+            6
+          ],
+          0,
+          "#e8dccb",
+          20,
+          "#d9a98a",
+          45,
+          "#b8785f"
+        ],
+        "fill-extrusion-height": [
+          "coalesce",
+          [
+            "get",
+            "render_height"
+          ],
+          6
+        ],
+        "fill-extrusion-base": [
+          "coalesce",
+          [
+            "get",
+            "render_min_height"
+          ],
+          0
+        ],
+        "fill-extrusion-opacity": 0.95,
+        "fill-extrusion-vertical-gradient": true
+      }
+    }
+  ]
+}

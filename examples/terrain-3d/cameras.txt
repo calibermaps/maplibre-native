@@ -1,0 +1,9 @@
+# name  lon  lat  zoom  pitch  bearing  centerAltitude
+# centerAltitude is meters: the ground height under the center (Mapterhorn) times the style's terrain exaggeration.
+# mbgl-render draws a single frame and never moves the camera up onto the terrain, so the still needs it spelled out.
+01-basic-terrain            11.3900  47.2900  11.4  60    0  1951
+02-hillshade-color-relief -121.7603  46.8523  11.2  60   25  5699
+03-vector-basemap            7.7491  46.0207  13.4  60  215  2244
+04-symbols                   7.7900  45.9850  11.3  60  262  4234
+05-overlays               -119.5850  37.7440  12.0  60   30  1812
+06-buildings                11.3950  47.2830  14.2  60  180  1218
