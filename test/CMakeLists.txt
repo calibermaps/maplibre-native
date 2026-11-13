@@ -30,6 +30,7 @@ add_library(
     ${PROJECT_SOURCE_DIR}/test/renderer/dem_elevation_provider.test.cpp
     ${PROJECT_SOURCE_DIR}/test/renderer/terrain_camera.test.cpp
     ${PROJECT_SOURCE_DIR}/test/renderer/terrain_drape_zoom_step.test.cpp
+    ${PROJECT_SOURCE_DIR}/test/renderer/terrain_drape_mipmaps.test.cpp
     ${PROJECT_SOURCE_DIR}/test/renderer/terrain_elevation_index.test.cpp
     ${PROJECT_SOURCE_DIR}/test/renderer/terrain_horizon_haze.test.cpp
     ${PROJECT_SOURCE_DIR}/test/renderer/terrain_fill_pattern_drape.test.cpp
