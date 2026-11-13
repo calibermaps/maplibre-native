@@ -13,6 +13,7 @@ MapLibre welcomes participation and contributions from everyone. Please read [`M
 - With 3D terrain on and the centre clamp enabled, the clamp no longer cancels a running camera animation; the camera is anchored to the ground once the animation ends ([#4768](https://github.com/maplibre/maplibre-native/pull/4768)).
 - With 3D terrain, annotation views, the user location view, callouts, line-placed labels and the collision index sit on the terrain surface instead of at sea level, so labels show, hide and overlap where they are drawn and pins on slopes can be selected. `-convertCoordinate:toPointToView:` and `-convertPoint:toCoordinateFromView:` answer on the terrain surface, from a copy of the terrain heights kept on the map side ([#4558](https://github.com/maplibre/maplibre-native/pull/4558)).
 - An `MLNColor` passed into a style value or an expression is written with whole-number channels, as MapLibre GL JS prints colors, so a fractional channel rounds to the nearest of 0-255 ([#4967](https://github.com/maplibre/maplibre-native/pull/4967)).
+- Add `MLNRenderingStats.numDrapeTargetsDeferred`, `numNewTileBuildsDeferred` and `numTerrainCoverPendingFrames`, which count why frames asked for a follow-up frame ([#4964](https://github.com/maplibre/maplibre-native/pull/4964)).
 
 ## 7.0.0
 
