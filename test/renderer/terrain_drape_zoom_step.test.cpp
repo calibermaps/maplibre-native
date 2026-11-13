@@ -215,10 +215,13 @@ TEST(TerrainDrape, CrossingALevelMatchesFreshTerrainDrawables) {
     ASSERT_GT(light, 2000u) << "the ground tiles did not draw";
     ASSERT_GT(dark, 2000u) << "the ground tiles did not draw";
 
-    // An exaggeration of 1.0001 instead of 1 shows nothing but makes the renderer replace its
-    // RenderTerrain: new terrain drawables, on the drape targets the map already has.
+    // Taking the terrain off and setting it again makes the renderer build a new RenderTerrain: new
+    // terrain drawables and new drape targets. (A new exaggeration alone no longer does.)
     idle = false;
-    map.getStyle().setTerrain(std::make_unique<style::Terrain>("dem", 1.0001f));
+    map.getStyle().setTerrain(nullptr);
+    ASSERT_TRUE(settle());
+    idle = false;
+    map.getStyle().setTerrain(std::make_unique<style::Terrain>("dem", 1.0f));
     ASSERT_TRUE(settle());
     const PremultipliedImage rebuilt = read();
 
