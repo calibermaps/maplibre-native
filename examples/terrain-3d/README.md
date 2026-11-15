@@ -1,6 +1,6 @@
 # 3D terrain examples
 
-Seven small examples for the 3D terrain on the `feature/terrain-3d` branch of MapLibre Native.
+Seven small examples (and an [iOS app](ios/README.md)) for the 3D terrain on the `feature/terrain-3d` branch of MapLibre Native.
 Each one is a single style JSON plus a camera. Everything uses public data with no API key, and every
 style loads straight from a local file (`file://`).
 
@@ -13,6 +13,7 @@ style loads straight from a local file (`file://`).
 | 5 | `styles/05-overlays.json` | Transparent fills with outlines, a dashed route, a gradient route and waypoint circles |
 | 6 | `styles/06-buildings.json` | Fill-extrusion buildings in a city, raised onto the relief |
 | 7 | `tour.txt` + `tour.sh` | A scripted camera tour with pitch and bearing changes |
+| iOS | [`ios/`](ios/README.md) | A small SwiftUI iPhone app: 2D/3D switch, exaggeration slider, peaks, tap for ground height, a flyover |
 
 The camera for each example (center, zoom, pitch, bearing, center altitude) is in `cameras.txt`.
 The shapes in example 5 and the points in example 4 are inline GeoJSON written for this kit. The routes and

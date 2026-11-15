@@ -1,0 +1,6 @@
+# The framework is built locally (see README.md) and is never committed.
+/MapLibre.xcframework/
+/MapLibre.xcframework.zip
+build/
+xcuserdata/
+DerivedData/
