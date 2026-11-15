@@ -150,6 +150,12 @@ public:
                                     const std::array<double, 2>& origin,
                                     const std::set<UnwrappedTileID>& hadFullSize);
 
+    /// Which edges of `tile` have another tile of `cover` beside them, as a mask: north 1, east 2,
+    /// south 4, west 8. The neighbor may be of the same zoom, a coarser tile that contains the
+    /// adjacent area, or any finer tile that touches the edge. TerrainSkirtLength::Shared hangs
+    /// a skirt on these edges only.
+    static uint8_t skirtEdges(const UnwrappedTileID& tile, const std::set<UnwrappedTileID>& cover);
+
     /// The cover with a one-ring dilation: every 8-neighbour of a tile, at that tile's zoom,
     /// except one that lies over, or under, a tile the cover already has (whatever its zoom).
     static std::set<UnwrappedTileID> dilateCover(const std::set<UnwrappedTileID>& cover);
@@ -237,6 +243,10 @@ public:
     /// turns it off to compare what it leaves out.
     static void setLeaveOutEmptyTilesForTesting(bool leaveOut);
     static bool leavesOutEmptyTiles();
+
+    /// Drops the mesh tiles `keep` returns false for, after the cap, so a test can leave the mesh
+    /// a frontier. An empty function (the default) keeps them all.
+    static void setMeshCoverFilterForTesting(std::function<bool(const UnwrappedTileID&)> keep);
 
     /**
      * @brief Get elevation at a specific tile coordinate
@@ -365,6 +375,13 @@ public:
         return it != drawableDemCoords.end()
                    ? it->second
                    : std::array<float, 4>{{1.0f / util::EXTENT, 0.0f, 0.0f, static_cast<float>(demDim)}};
+    }
+
+    /// The edges a tile's skirt hangs from (skirtEdges): all four unless the map's skirt setting
+    /// is TerrainSkirtLength::Shared.
+    float getDrawableSkirtEdges(const OverscaledTileID& tileID) const {
+        const auto it = skirtEdgeMasks.find(tileID);
+        return it != skirtEdgeMasks.end() ? static_cast<float>(it->second) : 15.0f;
     }
 
     /**
@@ -518,6 +535,8 @@ private:
     // Per-drawable scale/offset into the bound DEM texture ({1,0,0,0} unless
     // an ancestor tile's DEM is bound); read by the terrain layer tweaker
     std::map<OverscaledTileID, std::array<float, 4>> drawableDemCoords;
+    // skirtEdges of each tile of this frame's mesh cover, filled for TerrainSkirtLength::Shared only
+    std::map<OverscaledTileID, uint8_t> skirtEdgeMasks;
 #if MLN_RENDER_BACKEND_OPENGL
     // Per-tile demTextureArray layer (own or ancestor DEM), -1 when the tile has no packed DEM;
     // feeds the instanced depth pass (see rebuildInstancedDepthDrawable / depthInstances).
@@ -608,6 +627,7 @@ private:
         OverscaledTileID tileID;
         std::array<float, 4> demCoords; // scale, x/y offset, dem_dim (.w)
         float demLayer;                 // demTextureArray layer for this tile (own or ancestor)
+        float skirtEdges;
     };
     std::vector<DepthInstance> depthInstances; // current tile set, index == a_instance / gl_InstanceID
     std::size_t depthInstanceSignature = 0;    // hash of the tile set the instanced drawable was built for

@@ -283,7 +283,8 @@ MLN_EXPORT IB_DESIGNABLE @interface MLNMapView : NSView<MLNStylable>
  Skirts hide the hairline gaps (stitches) between neighbouring terrain tiles at
  different zoom levels. ``MLNTerrainSkirtLengthNone`` suits a map drawn over a
  transparent background, where the skirts would otherwise show as vertical artifacts.
- The default is ``MLNTerrainSkirtLengthAuto``. Changing this property rebuilds the
+ ``MLNTerrainSkirtLengthShared`` keeps the skirts between tiles and drops them at the end
+ of the mesh. The default is ``MLNTerrainSkirtLengthAuto``. Changing this property rebuilds the
  terrain mesh and every tile drawable. Has no effect when terrain is not enabled.
  */
 @property (nonatomic, assign) MLNTerrainSkirtLength terrainSkirtLength;

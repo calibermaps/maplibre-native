@@ -184,6 +184,9 @@ static_assert(static_cast<uint8_t>(MLNTerrainSkirtLengthAuto) ==
 static_assert(static_cast<uint8_t>(MLNTerrainSkirtLengthNone) ==
                   static_cast<uint8_t>(mln::TerrainSkirtLength::None),
               "MLNTerrainSkirtLengthNone must mirror mln::TerrainSkirtLength::None");
+static_assert(static_cast<uint8_t>(MLNTerrainSkirtLengthShared) ==
+                  static_cast<uint8_t>(mln::TerrainSkirtLength::Shared),
+              "MLNTerrainSkirtLengthShared must mirror mln::TerrainSkirtLength::Shared");
 
 @implementation MLNMapView {
   /// Cross-platform map view controller.

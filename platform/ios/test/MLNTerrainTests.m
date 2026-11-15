@@ -112,6 +112,9 @@
 
     self.mapView.terrainSkirtLength = MLNTerrainSkirtLengthAuto;
     XCTAssertEqual(self.mapView.terrainSkirtLength, MLNTerrainSkirtLengthAuto);
+
+    self.mapView.terrainSkirtLength = MLNTerrainSkirtLengthShared;
+    XCTAssertEqual(self.mapView.terrainSkirtLength, MLNTerrainSkirtLengthShared);
 }
 
 // The core `mln::TerrainLoadMode` and `mln::TerrainSkirtLength` enums (include/mln/map/mode.hpp)
@@ -124,6 +127,7 @@
 
     XCTAssertEqual(MLNTerrainSkirtLengthAuto, 0u);
     XCTAssertEqual(MLNTerrainSkirtLengthNone, 1u);
+    XCTAssertEqual(MLNTerrainSkirtLengthShared, 2u);
 }
 
 @end
