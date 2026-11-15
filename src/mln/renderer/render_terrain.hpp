@@ -233,6 +233,11 @@ public:
     /// reach the eviction with a few tiles. Pass 0 to restore the default.
     static void setMaxDEMTexturesForTesting(size_t cap);
 
+    /// Whether a source leaves out the tiles that build none of its layers (on by default); a test
+    /// turns it off to compare what it leaves out.
+    static void setLeaveOutEmptyTilesForTesting(bool leaveOut);
+    static bool leavesOutEmptyTiles();
+
     /**
      * @brief Get elevation at a specific tile coordinate
      * @param tileID The tile containing the coordinate
