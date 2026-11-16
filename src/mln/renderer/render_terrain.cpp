@@ -162,6 +162,8 @@ std::atomic<size_t> demTextureCapOverride{0};
 
 // Set by tests only (RenderTerrain::setLeaveOutEmptyTilesForTesting)
 std::atomic<bool> leaveOutEmptyTiles{true};
+// Set by tests only (RenderTerrain::setSourcesEndBelowMinZoomForTesting)
+std::atomic<bool> sourcesEndBelowMinZoom{true};
 std::function<bool(const UnwrappedTileID&)> meshCoverFilter;
 
 } // namespace
@@ -181,6 +183,14 @@ void RenderTerrain::setLeaveOutEmptyTilesForTesting(bool leaveOut) {
 
 bool RenderTerrain::leavesOutEmptyTiles() {
     return leaveOutEmptyTiles;
+}
+
+std::optional<uint8_t> RenderTerrain::sourceMinZoomReach() {
+    return sourcesEndBelowMinZoom ? std::optional<uint8_t>{1} : std::nullopt;
+}
+
+void RenderTerrain::setSourcesEndBelowMinZoomForTesting(bool end) {
+    sourcesEndBelowMinZoom = end;
 }
 
 void RenderTerrain::setMeshCoverFilterForTesting(std::function<bool(const UnwrappedTileID&)> keep) {

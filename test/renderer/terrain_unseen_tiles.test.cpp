@@ -325,8 +325,16 @@ public:
     ~LeavingOut() { RenderTerrain::setLeaveOutEmptyTilesForTesting(true); }
 };
 
-TilesBySource tilesRequested(bool leaveOut, double pitch) {
+// Turns the ending of a source where the ground is far below its minzoom on or off, and back on.
+class EndingBelowMinZoom {
+public:
+    explicit EndingBelowMinZoom(bool on) { RenderTerrain::setSourcesEndBelowMinZoomForTesting(on); }
+    ~EndingBelowMinZoom() { RenderTerrain::setSourcesEndBelowMinZoomForTesting(true); }
+};
+
+TilesBySource tilesRequested(bool leaveOut, double pitch, bool endBelowMinZoom = false) {
     const LeavingOut use(leaveOut);
+    const EndingBelowMinZoom end(endBelowMinZoom);
     FarFieldView view(false);
     EXPECT_TRUE(view.open(pitch));
     return view.requested;
@@ -440,6 +448,29 @@ TEST(TerrainUnseenTiles, ASourceDoesNotAskForTilesThatBuildNothingAtPitch85) {
                  {"reference_trails", 207}},
                 "left out");
     EXPECT_EQ(today.at("dem"), now.at("dem"));
+}
+
+// A source with a deep minzoom was covered at it over the far field, as far as the tile limit
+// let it. It ends where the ground is more than a zoom below its minzoom.
+TEST(TerrainUnseenTiles, ASourceEndsWhereTheGroundIsFarBelowItsMinZoom) {
+    for (const double pitch : {77.0, 85.0}) {
+        const TilesBySource whole = tilesRequested(true, pitch);
+        const TilesBySource now = tilesRequested(true, pitch, true);
+        print("whole cover", pitch, whole);
+        print("ends", pitch, now);
+
+        expectTiles(now,
+                    {{"backcountry_label_points", 15},
+                     {"backcountry_tile_features", 35},
+                     {"mvum_roads", 36},
+                     {"public_land_label_points", 10},
+                     {"reference_streams", 14},
+                     {"reference_trails", 36}},
+                    "ends");
+        EXPECT_LT(total(now) * 2, total(whole)) << "pitch " << pitch;
+        EXPECT_EQ(whole.at("imagery"), now.at("imagery")) << "pitch " << pitch;
+        EXPECT_EQ(whole.at("dem"), now.at("dem")) << "pitch " << pitch;
+    }
 }
 
 // What is left out must change no pixel: the same views with and without, after the view has been
