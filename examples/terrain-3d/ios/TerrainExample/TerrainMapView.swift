@@ -6,8 +6,7 @@ struct TerrainMapView: UIViewRepresentable {
     let controller: MapController
 
     func makeUIView(context: Context) -> MLNMapView {
-        let styleURL = Bundle.main.url(forResource: "style", withExtension: "json")
-        let mapView = MLNMapView(frame: .zero, styleURL: styleURL)
+        let mapView = MLNMapView(frame: .zero)
         mapView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         mapView.delegate = controller
         controller.attach(mapView)

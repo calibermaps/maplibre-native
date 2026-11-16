@@ -13,7 +13,7 @@ style loads straight from a local file (`file://`).
 | 5 | `styles/05-overlays.json` | Transparent fills with outlines, a dashed route, a gradient route and waypoint circles |
 | 6 | `styles/06-buildings.json` | Fill-extrusion buildings in a city, raised onto the relief |
 | 7 | `tour.txt` + `tour.sh` | A scripted camera tour with pitch and bearing changes |
-| iOS | [`ios/`](ios/README.md) | A small SwiftUI iPhone app: 2D/3D switch, exaggeration slider, peaks, tap for ground height, a flyover |
+| iOS | [`ios/`](ios/README.md) | A SwiftUI iPhone app with ten demos: 2D/3D switch, hillshade and color relief, 3D buildings, draped overlays, labels behind ridges, heatmap and circles, sky, load modes and stats, restyle, camera clamp |
 
 The camera for each example (center, zoom, pitch, bearing, center altitude) is in `cameras.txt`.
 The shapes in example 5 and the points in example 4 are inline GeoJSON written for this kit. The routes and
