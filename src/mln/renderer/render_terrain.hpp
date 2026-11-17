@@ -182,6 +182,11 @@ public:
     /// Tiles a source may cover per tile of the mesh-tile cap (TileParameters::coverTileLimit).
     static constexpr size_t sourceTilesPerMeshTile = 4;
 
+    /// How many times the mesh-tile cap a cover of one zoom may hold (computeMeshCover): the cap
+    /// is for the far tiles a steep pitch pulls in, and a view at or under the pitch threshold
+    /// has none.
+    static constexpr size_t oneZoomCoverCapFactor = 2;
+
     /// How far below its min zoom a source still covers the ground (TileParameters::coverMinZoomReach).
     /// The default level of detail puts ground at a zoom about one and a half below the scale it
     /// is drawn at, so with a reach of two a source ends about where the ground is drawn one and
