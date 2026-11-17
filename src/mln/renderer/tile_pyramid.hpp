@@ -16,6 +16,7 @@
 #include <unordered_map>
 #include <vector>
 #include <map>
+#include <set>
 
 namespace mln {
 
@@ -47,6 +48,8 @@ public:
     const std::map<UnwrappedTileID, std::reference_wrapper<Tile>>& getRenderedTiles() const { return renderedTiles; }
     /// The tiles the last update left out for building none of the layers
     const std::vector<UnwrappedTileID>& getEmptyTileIDs() const { return emptyTileIDs; }
+    /// Whether the last update kept the tile only because it is ahead of the view.
+    bool isAheadOnly(const OverscaledTileID& id) const { return aheadOnlyTiles.contains(id); }
     Tile* getTile(const OverscaledTileID&);
     const Tile* getRenderedTile(const UnwrappedTileID&) const;
 
@@ -85,6 +88,14 @@ private:
 
     std::map<UnwrappedTileID, std::reference_wrapper<Tile>> renderedTiles; // Sorted by tile id.
     std::vector<UnwrappedTileID> emptyTileIDs;
+    /// The tiles asked for ahead of the view (TileParameters::aheadViews), as last worked out,
+    /// and what they were worked out for.
+    std::vector<OverscaledTileID> aheadTiles;
+    uint64_t aheadViewsKey = 0;
+    int32_t aheadTileZoom = -1;
+    /// The tiles the last update kept only because they are ahead of the view. They are not
+    /// part of what the source has to show, so isLoaded() does not wait for them.
+    std::set<OverscaledTileID> aheadOnlyTiles;
     TileObserver* observer = nullptr;
 
     float prevLng = 0;

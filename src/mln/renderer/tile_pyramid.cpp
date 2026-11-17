@@ -36,7 +36,7 @@ TilePyramid::~TilePyramid() = default;
 
 bool TilePyramid::isLoaded() const {
     for (const auto& pair : tiles) {
-        if (!pair.second->isComplete()) {
+        if (!pair.second->isComplete() && !aheadOnlyTiles.contains(pair.first)) {
             return false;
         }
     }
@@ -178,14 +178,17 @@ void TilePyramid::update(const std::vector<Immutable<style::LayerProperties>>& l
         util::keepNearestTiles(panTiles, parameters.coverTileLimit, parameters.coverTileLimitOrigin);
     }
 
+    const bool leaveOutEmptyTiles = parameters.leaveOutEmptyTiles &&
+                                    (type == SourceType::Vector || type == SourceType::GeoJSON);
+    const auto buildsNothing = [&](const OverscaledTileID& id) {
+        return std::none_of(layers.begin(), layers.end(), [&](const auto& layer) {
+            const auto& impl = *layer->baseImpl;
+            return id.overscaledZ >= std::floor(impl.minZoom) && id.overscaledZ < std::ceil(impl.maxZoom);
+        });
+    };
+
     // After the cap, so that it keeps the tiles it did and only these go
-    if (parameters.leaveOutEmptyTiles && (type == SourceType::Vector || type == SourceType::GeoJSON)) {
-        const auto buildsNothing = [&](const OverscaledTileID& id) {
-            return std::none_of(layers.begin(), layers.end(), [&](const auto& layer) {
-                const auto& impl = *layer->baseImpl;
-                return id.overscaledZ >= std::floor(impl.minZoom) && id.overscaledZ < std::ceil(impl.maxZoom);
-            });
-        };
+    if (leaveOutEmptyTiles) {
         for (auto* cover : {&idealTiles, &panTiles}) {
             for (const auto& id : *cover) {
                 if (buildsNothing(id)) emptyTileIDs.push_back(id.toUnwrapped());
@@ -194,6 +197,43 @@ void TilePyramid::update(const std::vector<Immutable<style::LayerProperties>>& l
         }
         std::sort(emptyTileIDs.begin(), emptyTileIDs.end());
         emptyTileIDs.erase(std::unique(emptyTileIDs.begin(), emptyTileIDs.end()), emptyTileIDs.end());
+    }
+
+    // The tiles ahead of the view: what the views a turn or a pan would bring up cover, in the
+    // order of those views. Worked out when the views change, not every frame; the tiles the view
+    // itself now covers are taken out below, and the rest are cut to what the limits leave.
+    if (parameters.aheadViews.empty() || std::cmp_less(overscaledZoom, zoomRange.min)) {
+        aheadTiles.clear();
+        aheadViewsKey = 0;
+    } else if (parameters.aheadViewsKey != aheadViewsKey || tileZoom != aheadTileZoom) {
+        aheadViewsKey = parameters.aheadViewsKey;
+        aheadTileZoom = tileZoom;
+        aheadTiles.clear();
+        std::set<OverscaledTileID> seen;
+        const int32_t idealZoom = std::min<int32_t>(zoomRange.max, overscaledZoom);
+        for (const auto& view : parameters.aheadViews) {
+            util::TileCoverParameters aheadCover = tileCoverParameters;
+            aheadCover.transformState = view.state;
+            aheadCover.tileLodOrigin = view.tileLodOrigin;
+            for (const auto& id : util::tileCover(aheadCover, idealZoom, zoomRange, tileZoom)) {
+                if (seen.insert(id).second) {
+                    aheadTiles.push_back(id);
+                }
+            }
+        }
+    }
+    std::vector<OverscaledTileID> tilesAhead;
+    if (!aheadTiles.empty()) {
+        size_t room = parameters.aheadTileLimit;
+        if (parameters.coverTileLimit > 0) {
+            room = std::min(room, parameters.coverTileLimit - std::min(parameters.coverTileLimit, idealTiles.size()));
+        }
+        const std::set<OverscaledTileID> inView(idealTiles.begin(), idealTiles.end());
+        for (const auto& id : aheadTiles) {
+            if (tilesAhead.size() >= room) break;
+            if (inView.contains(id) || (leaveOutEmptyTiles && buildsNothing(id))) continue;
+            tilesAhead.push_back(id);
+        }
     }
 
     // Stores a list of all the tiles that we're definitely going to retain.
@@ -207,6 +247,21 @@ void TilePyramid::update(const std::vector<Immutable<style::LayerProperties>>& l
         if (retain.emplace(tile.id).second) {
             tile.setUpdateParameters({.minimumUpdateInterval = minimumUpdateInterval, .isVolatile = isVolatile});
             tile.setNecessity(necessity);
+        }
+
+        if (needsRelayout) {
+            tile.setLayers(layers, parameters.globalState);
+        }
+    };
+    // A tile kept only for being ahead of the view. One the view also keeps (as a tile of its
+    // cover, or as a stand-in for one) was retained first, with the view's parameters.
+    aheadOnlyTiles.clear();
+    auto retainAheadTileFn = [&](Tile& tile, TileNecessity necessity) -> void {
+        if (retain.emplace(tile.id).second) {
+            tile.setUpdateParameters(
+                {.minimumUpdateInterval = minimumUpdateInterval, .isVolatile = isVolatile, .ahead = true});
+            tile.setNecessity(necessity);
+            aheadOnlyTiles.insert(tile.id);
         }
 
         if (needsRelayout) {
@@ -308,6 +363,19 @@ void TilePyramid::update(const std::vector<Immutable<style::LayerProperties>>& l
                                  tiles,
                                  zoomRange,
                                  maxParentTileOverscaleFactor);
+
+    // After the view's own tiles, so that a tile both need is kept as the view's
+    if (!tilesAhead.empty()) {
+        algorithm::updateRenderables(
+            getTileFn,
+            createTileFn,
+            retainAheadTileFn,
+            [](const UnwrappedTileID&, Tile&) {},
+            tilesAhead,
+            emptyPrefetchedTiles,
+            zoomRange,
+            maxParentTileOverscaleFactor);
+    }
 
     for (auto previouslyRenderedTile : previouslyRenderedTiles) {
         Tile& tile = previouslyRenderedTile.second;

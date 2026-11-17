@@ -569,6 +569,16 @@ void RenderTileSource::reduceMemoryUse() {
     tilePyramid.reduceMemoryUse();
 }
 
+void RenderTileSource::tileChanged(Tile& tile, const bool changesTheView) {
+    if (changesTheView || !tilePyramid.isAheadOnly(tile.id)) {
+        RenderSource::onTileChanged(tile);
+    }
+}
+
+void RenderTileSource::onTileChanged(Tile& tile) {
+    tileChanged(tile, false);
+}
+
 void RenderTileSource::dumpDebugLogs() const {
     tilePyramid.dumpDebugLogs();
 }

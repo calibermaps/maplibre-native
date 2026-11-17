@@ -353,6 +353,14 @@ std::unique_ptr<RenderTree> RenderOrchestrator::createRenderTree(
                                                  : 0;
     tileParameters.coverTileLimitOrigin = RenderTerrain::meshTileCapOrigin(updateParameters->transformState);
 
+    // Under terrain a continuous map loads the tiles a turn or a pan would bring into view before
+    // they are in it. A still or a tile-mode map draws one view.
+    if (terrainEnabled && updateParameters->mode == MapMode::Continuous && RenderTerrain::loadsAhead()) {
+        tileParameters.aheadViews = RenderTerrain::aheadViews(
+            updateParameters->transformState, elevationProvider.getRevision(), tileParameters.aheadViewsKey);
+        tileParameters.aheadTileLimit = RenderTerrain::aheadTileLimit;
+    }
+
     // The ground under the camera's eye has to be known to keep the eye above it
     // (Renderer::Impl::render), and its DEM tile lies outside the view's cover as often as not.
     std::optional<LatLng> terrainEye;

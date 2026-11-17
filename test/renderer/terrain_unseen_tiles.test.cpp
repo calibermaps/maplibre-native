@@ -230,9 +230,14 @@ public:
               observer,
               fileSource,
               MapOptions().withMapMode(MapMode::Continuous).withSize(frontend.getSize())) {
-        fileSource->tileResponse = [this, vectorContent](const Resource& resource) {
-            Response res;
+        fileSource->tileResponse = [this, vectorContent](const Resource& resource) -> std::optional<Response> {
             const Request request = requestOf(resource.url);
+            if (oneAtATime && request.source != "dem") {
+                const auto now = std::chrono::steady_clock::now();
+                if (now < nextAnswer) return std::nullopt;
+                nextAnswer = now + std::chrono::milliseconds(20);
+            }
+            Response res;
             if (shown || request.source == "dem") requested[request.source].insert(request.tile);
             if (request.source == "dem") {
                 res.data = std::make_shared<std::string>(dem);
@@ -247,6 +252,9 @@ public:
         };
         observer.didBecomeIdleCallback = [this] {
             idle = true;
+        };
+        observer.didFinishRenderingFrameCallback = [this](MapObserver::RenderFrameStatus) {
+            frames++;
         };
         map.setTerrainLoadMode(TerrainLoadMode::Balanced);
         map.setBounds(BoundOptions().withMaxPitch(85.0));
@@ -308,6 +316,8 @@ public:
                        .withPitch(pitch));
     }
 
+    void turn(double bearing) { map.jumpTo(CameraOptions().withBearing(bearing)); }
+
     TilesBySource requested;
 
     util::RunLoop loop;
@@ -320,6 +330,11 @@ public:
     MapAdapter map;
     bool idle = false;
     bool shown = false;
+    size_t frames = 0;
+    // Imagery and overlay tiles come in one every 20 ms, as over a network, not all in one turn of
+    // the run loop
+    bool oneAtATime = false;
+    std::chrono::steady_clock::time_point nextAnswer;
 };
 
 // Turns the leaving out of tiles that build none of a source's layers on or off, and back on.
@@ -336,9 +351,18 @@ public:
     ~EndingBelowMinZoom() { RenderTerrain::setSourcesEndBelowMinZoomForTesting(true); }
 };
 
+// Turns the loading of tiles ahead of the view on or off, and back on.
+class LoadingAhead {
+public:
+    explicit LoadingAhead(bool on) { RenderTerrain::setLoadsAheadForTesting(on); }
+    ~LoadingAhead() { RenderTerrain::setLoadsAheadForTesting(true); }
+};
+
+// What the view itself asks for: the tiles ahead of it are another matter (TerrainLoadAhead).
 TilesBySource tilesRequested(bool leaveOut, double pitch, bool endBelowMinZoom = false) {
     const LeavingOut use(leaveOut);
     const EndingBelowMinZoom end(endBelowMinZoom);
+    const LoadingAhead ahead(false);
     FarFieldView view(false);
     EXPECT_TRUE(view.open(pitch));
     return view.requested;
@@ -482,4 +506,75 @@ TEST(TerrainUnseenTiles, LeavingThemOutLeavesThePictureAsItWas) {
         EXPECT_LE(difference.pixels, tolerance) << "at pitch " << without[i].pitch << " step " << i;
         EXPECT_GT(drawn(with[i].image), 10000u) << "the picture is not blank";
     }
+}
+
+namespace {
+
+// The tiles each source lacks when a settled view at pitch 60 turns by `degrees`. The turn itself
+// loads nothing ahead, so what it asks for is what the turned view did not find.
+TilesBySource askedForByATurn(bool ahead, double degrees) {
+    RenderTerrain::setLoadsAheadForTesting(ahead);
+    FarFieldView view(false);
+    EXPECT_TRUE(view.open(60.0));
+    const TilesBySource before = view.requested;
+    RenderTerrain::setLoadsAheadForTesting(false);
+    view.turn(degrees);
+    EXPECT_TRUE(view.settle());
+    RenderTerrain::setLoadsAheadForTesting(true);
+    TilesBySource asked;
+    for (const auto& [source, ids] : view.requested) {
+        const auto it = before.find(source);
+        for (const auto& id : ids) {
+            if (it == before.end() || !it->second.contains(id)) asked[source].insert(id);
+        }
+    }
+    return asked;
+}
+
+} // namespace
+
+// A phone's view is 17.5 degrees across, so a turn of 15 degrees brings mostly new ground into
+// view, and every tile of it was asked for only then. A continuous map under terrain asks for
+// the tiles of the views a turn or a pan would bring up while the view is still.
+TEST(TerrainLoadAhead, ATurnFindsItsTilesAlreadyAskedFor) {
+    for (const double degrees : {15.0, -15.0}) {
+        const TilesBySource without = askedForByATurn(false, degrees);
+        const TilesBySource with = askedForByATurn(true, degrees);
+        print("turn, no load ahead", 60.0, without);
+        print("turn, load ahead", 60.0, with);
+
+        ASSERT_TRUE(without.contains("imagery")) << degrees;
+        ASSERT_TRUE(without.contains("dem")) << degrees;
+        EXPECT_GT(without.at("imagery").size(), 5u) << degrees;
+        EXPECT_GT(without.at("dem").size(), 5u) << degrees;
+        // The turned view finds its imagery whole. It still asks for the elevation tile under the
+        // camera's eye, which no view ahead covers, and for the odd overlay tile where the cover
+        // shifts once that elevation is in.
+        EXPECT_FALSE(with.contains("imagery")) << degrees;
+        EXPECT_LE(with.contains("dem") ? with.at("dem").size() : 0u, 1u) << degrees;
+        EXPECT_LE(total(with) * 5, total(without)) << degrees;
+    }
+}
+
+// A tile ahead of the view is not on screen, so its coming in is no reason to draw: a still map
+// that drew a frame for each of them would be drawing for as long as they load. (An elevation tile
+// ahead of the view that gives a tile in view its border does change what is on screen.)
+TEST(TerrainLoadAhead, ATileAheadOfTheViewAsksForNoFrame) {
+    RenderTerrain::setLoadsAheadForTesting(false);
+    FarFieldView view(false);
+    EXPECT_TRUE(view.open(60.0));
+    const size_t askedForByTheView = total(view.requested);
+
+    RenderTerrain::setLoadsAheadForTesting(true);
+    view.oneAtATime = true;
+    view.frames = 0;
+    view.map.triggerRepaint();
+    size_t before = 0;
+    do {
+        before = total(view.requested);
+        view.pump(std::chrono::seconds(1));
+    } while (total(view.requested) != before);
+    const size_t askedForAhead = total(view.requested) - askedForByTheView;
+    EXPECT_GT(askedForAhead, 100u);
+    EXPECT_LT(view.frames * 4, askedForAhead) << view.frames << " frames for " << askedForAhead << " tiles";
 }

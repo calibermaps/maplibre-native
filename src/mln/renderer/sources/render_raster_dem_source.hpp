@@ -40,6 +40,8 @@ public:
     /// like getElevationRange it changes only when DEM data arrives. nullopt until a tile has
     /// loaded.
     std::optional<Range<int32_t>> getNearbyElevationRange(const CanonicalTileID& id) const;
+    /// Changes whenever the answers of getElevationRange or getNearbyElevationRange may have.
+    uint64_t getElevationRevision() const { return elevationRevision; }
 
 private:
     // RenderTileSetSource overrides
@@ -70,6 +72,7 @@ private:
     /// ranges rebuilt from those it does. Far more than one view loads, ancestors included, so a
     /// still camera cannot cause a second drop.
     static constexpr std::size_t maxElevationRangeEntries = 8192;
+    uint64_t elevationRevision = 0;
 };
 
 } // namespace mln

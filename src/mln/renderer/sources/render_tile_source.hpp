@@ -61,6 +61,11 @@ protected:
     mutable RenderTiles filteredRenderTiles;
     mutable RenderTiles renderTilesSortedByY;
 
+    /// Tells the observer that a tile changed. A tile kept only for being ahead of the view changes
+    /// nothing on screen when it loads, so it asks for no frame unless `changesTheView`.
+    void tileChanged(Tile&, bool changesTheView);
+    void onTileChanged(Tile&) override;
+
 private:
     float bearing = 0.0F;
     SourceFeatureState featureState;
