@@ -165,6 +165,8 @@ std::atomic<size_t> demTextureCapOverride{0};
 std::atomic<bool> leaveOutEmptyTiles{true};
 // Set by tests only (RenderTerrain::setSourcesEndBelowMinZoomForTesting)
 std::atomic<bool> sourcesEndBelowMinZoom{true};
+// Set by tests only (RenderTerrain::setLoadsAheadForTesting)
+std::atomic<bool> loadAhead{true};
 std::function<bool(const UnwrappedTileID&)> meshCoverFilter;
 
 } // namespace
@@ -184,6 +186,68 @@ void RenderTerrain::setLeaveOutEmptyTilesForTesting(bool leaveOut) {
 
 bool RenderTerrain::leavesOutEmptyTiles() {
     return leaveOutEmptyTiles;
+}
+
+void RenderTerrain::setLoadsAheadForTesting(bool ahead) {
+    loadAhead = ahead;
+}
+
+bool RenderTerrain::loadsAhead() {
+    return loadAhead;
+}
+
+std::vector<TileParameters::AheadView> RenderTerrain::aheadViews(const TransformState& state,
+                                                                 const uint64_t elevation,
+                                                                 uint64_t& key) {
+    // Snap the view: bearing to 7.5 degrees, the centre to a quarter of the shorter side of the
+    // viewport, the zoom to a quarter level, the pitch to 2.5 degrees.
+    const double bearingStep = util::deg2rad(7.5);
+    const double pitchStep = util::deg2rad(2.5);
+    const double scale = std::pow(2.0, state.getZoom());
+    const double pixelsAcrossWorld = util::tileSize_D * scale;
+    const double shorter = std::min(state.getSize().width, state.getSize().height);
+    const double centreStep = shorter / 4.0 / pixelsAcrossWorld; // in normalized web-mercator
+    const LatLng centre = state.getLatLng();
+    const Point<double> mercator = Projection::project(centre, 1.0) / util::tileSize_D;
+    const auto snap = [](double value, double step) {
+        return std::round(value / step);
+    };
+    const auto bearing = static_cast<int64_t>(snap(state.getBearing(), bearingStep));
+    const auto pitch = static_cast<int64_t>(snap(state.getPitch(), pitchStep));
+    const auto zoom = static_cast<int64_t>(snap(state.getZoom(), 0.25));
+    const auto x = static_cast<int64_t>(snap(mercator.x, centreStep));
+    const auto y = static_cast<int64_t>(snap(mercator.y, centreStep));
+    std::size_t hash = 0;
+    for (const int64_t part : {bearing,
+                               pitch,
+                               zoom,
+                               x,
+                               y,
+                               static_cast<int64_t>(state.getSize().width),
+                               static_cast<int64_t>(state.getSize().height)}) {
+        util::hash_combine(hash, part);
+    }
+    util::hash_combine(hash, elevation);
+    key = static_cast<uint64_t>(hash) | 1u; // never 0, which means no views
+
+    std::vector<TileParameters::AheadView> views;
+    const auto add = [&](const TransformState& view) {
+        views.push_back({.state = view, .tileLodOrigin = meshTileCapOrigin(view)});
+    };
+    const auto addTurned = [&](const double degrees) {
+        TransformState turned = state;
+        turned.setBearing(state.getBearing() + util::deg2rad(degrees));
+        add(turned);
+    };
+    addTurned(15.0);
+    addTurned(-15.0);
+    TransformState wider = state;
+    wider.setSize(
+        {static_cast<uint32_t>(state.getSize().width * 1.5), static_cast<uint32_t>(state.getSize().height * 1.5)});
+    add(wider);
+    addTurned(30.0);
+    addTurned(-30.0);
+    return views;
 }
 
 size_t RenderTerrain::meshTileCap(const size_t modeCap,

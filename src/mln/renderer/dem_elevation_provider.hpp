@@ -42,6 +42,9 @@ public:
 
     std::optional<Range<double>> getTileElevationRange(const CanonicalTileID&) const override;
 
+    /// Changes whenever the ranges may have: with the DEM tiles loaded and the exaggeration.
+    uint64_t getRevision() const;
+
 private:
     const RenderRasterDEMSource* demSource;
     double exaggeration;

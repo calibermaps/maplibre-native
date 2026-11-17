@@ -1,14 +1,17 @@
 #pragma once
 
 #include <mln/map/mode.hpp>
+#include <mln/map/transform_state.hpp>
 #include <mln/actor/scheduler.hpp>
 #include <mln/util/feature.hpp>
 #include <mln/util/geo.hpp>
 
 #include <array>
+#include <cstdint>
 #include <memory>
 #include <numbers>
 #include <optional>
+#include <vector>
 
 #include <mapbox/std/weak.hpp>
 
@@ -79,6 +82,21 @@ public:
     bool leaveOutEmptyTiles = false;
     /// With terrain on: util::TileCoverParameters::minZoomReach for the source's covers.
     std::optional<uint8_t> coverMinZoomReach = std::nullopt;
+
+    /// A view the camera may be at next, with the level-of-detail origin it would have there.
+    struct AheadView {
+        TransformState state;
+        std::optional<std::array<double, 2>> tileLodOrigin;
+    };
+    /// Views a turn or a pan would bring up, nearest first (RenderTerrain::aheadViews). A source
+    /// asks for the tiles they cover and the view does not, at low priority, and keeps them
+    /// without drawing them, so that ground coming into view is already there. Empty: none.
+    std::vector<AheadView> aheadViews = {};
+    /// Changes when `aheadViews` does, so a source works its tiles out once per change.
+    uint64_t aheadViewsKey = 0;
+    /// The most tiles a source asks for ahead of the view. With `coverTileLimit`, the view's own
+    /// tiles count against that limit first.
+    size_t aheadTileLimit = 0;
 };
 
 } // namespace mln
