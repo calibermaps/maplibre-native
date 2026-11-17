@@ -4,6 +4,7 @@ MapLibre welcomes participation and contributions from everyone. Please read [`M
 
 ## main
 
+- With 3D terrain on, a continuous map loads the tiles a turn or a pan would bring into view before they are in it, at low priority and without drawing them, so new ground is there when the camera gets to it. It holds up to 128 more tiles per source in memory.
 - Add `MLNMapView.fieldOfView`, the vertical field of view of the map’s camera in degrees, and `-[MLNMapView setCenterCoordinate:centerAltitude:fromEyeCoordinate:eyeAltitude:]`, which puts the camera at an eye position looking at a point, above the eye included.
 - Fix a crash when a multi-condition `case` expression has an `all`, `any` or `!` condition. Its conditions were serialized as raw `NSCompoundPredicate` objects instead of JSON ([#4872](https://github.com/maplibre/maplibre-native/issues/4872)).
 - Add `MLNSource.isVolatile`: a source whose tiles are never written to the ambient cache on disk, as `Source.setVolatile()` on Android ([#4843](https://github.com/maplibre/maplibre-native/issues/4843)).
