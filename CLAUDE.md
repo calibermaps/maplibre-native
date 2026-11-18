@@ -66,6 +66,9 @@ Results and the gap list: `upstream-previews/terrain-3d-parity-tests.md` on the 
   (`name_path_pattern` like `RenderTerrain/updateElevationIndex`, `include_body: true` returns
   just that function), `find_referencing_symbols`, `find_implementations`, `find_declaration`,
   `get_diagnostics_for_file`. Always pass `relative_path` to narrow the search.
+  A method body lives in the `.cpp` under the name `Class::method` (for example
+  `RenderTerrain::updateElevationIndex` with `relative_path` the `.cpp`); `Class/method` finds only
+  the one-line declaration in the header. Use the `.cpp` name for references too.
   `.serena/project.yml` limits it to `src`, `include` (not `include/mln/shaders/gl`) and
   `test/renderer`. Paths in `.mcp.json` are for the Intel Mac.
 - Make the compile database first: `scripts/terrain-evidence/export_compile_db.sh` copies the
