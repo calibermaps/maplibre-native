@@ -184,3 +184,31 @@ TEST(RasterDEMTile, onParsedEmpty) {
     EXPECT_TRUE(tile.isLoaded());
     EXPECT_TRUE(tile.isComplete());
 }
+
+// A tile asked for ahead of the view waits behind the tiles in view, and its request goes out
+// again at its own priority once it is one of them.
+TEST(RasterDEMTile, ATileAskedForAheadIsLowPriorityUntilItIsInView) {
+    RasterDEMTileTest test;
+    auto fileSource = std::static_pointer_cast<FakeFileSource>(test.fileSource);
+
+    RasterTile imagery(OverscaledTileID(0, 0, 0), "imagery", test.tileParameters, test.tileset);
+    imagery.setUpdateParameters({.minimumUpdateInterval = Duration::zero(), .isVolatile = false, .ahead = true});
+    imagery.setNecessity(TileNecessity::Required);
+    ASSERT_EQ(fileSource->requests.size(), 1u);
+    EXPECT_EQ(fileSource->requests.back()->resource.priority, Resource::Priority::Low);
+
+    imagery.setUpdateParameters({.minimumUpdateInterval = Duration::zero(), .isVolatile = false});
+    ASSERT_EQ(fileSource->requests.size(), 1u);
+    EXPECT_EQ(fileSource->requests.back()->resource.priority, Resource::Priority::Regular);
+
+    NoElevation terrain;
+    test.tileParameters.elevationProvider = &terrain;
+    RasterDEMTile elevation(OverscaledTileID(0, 0, 0), "elevation", test.tileParameters, test.tileset);
+    elevation.setUpdateParameters({.minimumUpdateInterval = Duration::zero(), .isVolatile = false, .ahead = true});
+    elevation.setNecessity(TileNecessity::Required);
+    ASSERT_EQ(fileSource->requests.size(), 2u);
+    EXPECT_EQ(fileSource->requests.back()->resource.priority, Resource::Priority::Low);
+    elevation.setUpdateParameters({.minimumUpdateInterval = Duration::zero(), .isVolatile = false});
+    ASSERT_EQ(fileSource->requests.size(), 2u);
+    EXPECT_EQ(fileSource->requests.back()->resource.priority, Resource::Priority::High);
+}

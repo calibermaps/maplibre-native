@@ -4,6 +4,7 @@
 
 ### ✨ Features and improvements
 
+- With 3D terrain on, a continuous map loads the tiles a turn or a pan would bring into view before they are in it, at low priority and without drawing them, so new ground is there when the camera gets to it. It holds up to 128 more tiles per source in memory.
 - Make symbol guard checks opt-in, so symbol-dense tiles load faster. To keep them, set the environment variable `MLN_SYMBOL_GUARDS=1` before the first map loads.
 - With 3D terrain, pinch, rotate, tilt and quick-zoom gestures turn around the ground under the middle of the screen instead of a sea-level point beneath it. Add `MapLibreMap.getCenterAltitude()` and `setCenterAltitudeKeepingView(double)`: a target and zoom describe the same view only at the same centre altitude, so save the altitude with a `CameraPosition` and restore it before moving the camera back ([#4712](https://github.com/maplibre/maplibre-native/pull/4712)).
 

@@ -1,6 +1,7 @@
 #include <mln/renderer/dem_elevation_provider.hpp>
 
 #include <mln/renderer/sources/render_raster_dem_source.hpp>
+#include <mln/util/hash.hpp>
 
 namespace mln {
 
@@ -9,6 +10,13 @@ DEMElevationProvider::DEMElevationProvider(const RenderSource* demSource_, doubl
                     ? static_cast<const RenderRasterDEMSource*>(demSource_)
                     : nullptr),
       exaggeration(exaggeration_) {}
+
+uint64_t DEMElevationProvider::getRevision() const {
+    std::size_t revision = 0;
+    util::hash_combine(revision, demSource ? demSource->getElevationRevision() : uint64_t{0});
+    util::hash_combine(revision, exaggeration);
+    return revision;
+}
 
 std::optional<Range<double>> DEMElevationProvider::getTileElevationRange(const CanonicalTileID& id) const {
     if (!demSource) {

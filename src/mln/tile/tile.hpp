@@ -38,10 +38,13 @@ class UploadPass;
 struct TileUpdateParameters {
     Duration minimumUpdateInterval;
     bool isVolatile;
+    /// The tile is asked for ahead of the view (TileParameters::aheadViews): its network requests
+    /// go out at low priority, behind those of the tiles in view, for as long as this is set.
+    bool ahead = false;
 };
 
 inline bool operator==(const TileUpdateParameters& a, const TileUpdateParameters& b) {
-    return a.minimumUpdateInterval == b.minimumUpdateInterval && a.isVolatile == b.isVolatile;
+    return a.minimumUpdateInterval == b.minimumUpdateInterval && a.isVolatile == b.isVolatile && a.ahead == b.ahead;
 }
 
 inline bool operator!=(const TileUpdateParameters& a, const TileUpdateParameters& b) {

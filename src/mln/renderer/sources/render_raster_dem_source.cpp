@@ -107,7 +107,11 @@ std::optional<Range<int32_t>> RenderRasterDEMSource::getNearbyElevationRange(con
 }
 
 void RenderRasterDEMSource::addElevationRange(const CanonicalTileID& id, const Range<int32_t> range) {
+    if (const auto known = elevationRanges.find(id); known != elevationRanges.end() && known->second == range) {
+        return;
+    }
     elevationRanges.insert_or_assign(id, range);
+    ++elevationRevision;
 
     // Widen the descendant range of each ancestor, from the parent up: O(z) per arrival. Every
     // range that went into a tile's entry also went into its parent's, so a parent's entry
@@ -152,6 +156,8 @@ void RenderRasterDEMSource::onTileChanged(Tile& tile) {
         {DEMTileNeighbors::BottomCenter, DEMTileNeighbors::TopCenter},
         {DEMTileNeighbors::BottomLeft, DEMTileNeighbors::TopRight}};
 
+    // A tile ahead of the view asks for a frame only when a tile in view took a border from it
+    bool gaveAViewTileItsBorder = false;
     if (tile.isRenderable() && demtile.neighboringTiles != DEMTileNeighbors::Complete) {
         const CanonicalTileID canonical = tile.id.canonical;
         const auto dim = static_cast<uint32_t>(std::pow(2, canonical.z));
@@ -198,6 +204,7 @@ void RenderRasterDEMSource::onTileChanged(Tile& tile) {
                     const DEMTileNeighbors& borderMask = opposites[mask];
                     if ((borderTile.neighboringTiles & borderMask) != borderMask) {
                         borderTile.backfillBorder(demtile, borderMask);
+                        gaveAViewTileItsBorder = gaveAViewTileItsBorder || !tilePyramid.isAheadOnly(neighborid);
                     }
                 }
             }
@@ -211,7 +218,7 @@ void RenderRasterDEMSource::onTileChanged(Tile& tile) {
         }
         addElevationRange(tile.id.canonical, elevationRangeOf(*bucket));
     }
-    RenderTileSource::onTileChanged(tile);
+    tileChanged(tile, gaveAViewTileItsBorder);
 }
 
 std::unordered_map<std::string, std::vector<Feature>> RenderRasterDEMSource::queryRenderedFeatures(

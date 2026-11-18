@@ -5,6 +5,7 @@
 #include <mln/util/immutable.hpp>
 #include <mln/tile/tile_id.hpp>
 #include <mln/util/color.hpp>
+#include <mln/renderer/tile_parameters.hpp>
 #include <mln/util/constants.hpp>
 #include <mln/gfx/vertex_buffer.hpp>
 #include <mln/gfx/index_buffer.hpp>
@@ -180,6 +181,24 @@ public:
 
     /// Tiles a source may cover per tile of the mesh-tile cap (TileParameters::coverTileLimit).
     static constexpr size_t sourceTilesPerMeshTile = 4;
+
+    /// The views a source loads tiles for ahead of the camera (TileParameters::aheadViews), nearest
+    /// first: the view turned 15 degrees each way, the view half again as wide and as tall (for a
+    /// pan), then the view turned 30 degrees each way. A phone held upright sees 17.5 degrees across, so a turn of
+    /// 30 degrees replaces more than half of what is in view. Each has the level-of-detail origin
+    /// the camera would have there. `key` is of the view snapped to a coarse grid of bearing,
+    /// pitch, position and zoom, and of `elevation` (DEMElevationProvider::getRevision: the tile
+    /// covers follow the ground, so they change as its elevation comes in), so that a source works
+    /// its tiles out again in steps, not every frame.
+    static std::vector<TileParameters::AheadView> aheadViews(const TransformState& state,
+                                                             uint64_t elevation,
+                                                             uint64_t& key);
+    /// The most tiles a source asks for ahead of the view (TileParameters::aheadTileLimit).
+    static constexpr size_t aheadTileLimit = 128;
+    /// Whether sources load tiles ahead of the view under terrain (on by default); a test turns
+    /// it off to compare.
+    static void setLoadsAheadForTesting(bool ahead);
+    static bool loadsAhead();
 
     /// How far below its min zoom a source still covers the ground (TileParameters::coverMinZoomReach).
     /// The default level of detail puts ground at a zoom about one and a half below the scale it

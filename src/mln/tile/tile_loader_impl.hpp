@@ -209,7 +209,14 @@ void TileLoader<T>::loadFromNetwork() {
     resource.storagePolicy = updateParameters.isVolatile ? Resource::StoragePolicy::Volatile
                                                          : Resource::StoragePolicy::Permanent;
 
-    request = fileSource->request(resource, [this, shared_{shared}](const Response& res) {
+    // A tile asked for ahead of the view waits behind the tiles in view. setUpdateParameters
+    // issues the request again when that changes, so it does not stay behind once it is in view.
+    Resource requested = resource;
+    if (updateParameters.ahead) {
+        requested.setPriority(Resource::Priority::Low);
+    }
+
+    request = fileSource->request(requested, [this, shared_{shared}](const Response& res) {
         do {
             if (shared_->requestLock.try_lock_shared()) {
                 std::shared_lock<std::shared_mutex> lock(shared_->requestLock, std::adopt_lock);
