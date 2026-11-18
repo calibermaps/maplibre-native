@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "clangd": {
+      "command": "/Users/nick/.local/bin/mcp-language-server",
+      "args": ["--workspace", ".", "--lsp", "/usr/bin/clangd", "--", "--compile-commands-dir=.", "--background-index", "--header-insertion=never", "--log=error"]
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "base_test_path": ".",
+  "cache_path": "../../../metrics/cache-style.db",
+  "expectation_paths": [],
+  "ignore_paths": [],
+  "metric_path": "."
+}

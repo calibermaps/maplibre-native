@@ -64,3 +64,4 @@ out.png
 **/target/
 **/*.rs.bk
 **/*.profraw
+metrics/cache-terrain-gljs.db
