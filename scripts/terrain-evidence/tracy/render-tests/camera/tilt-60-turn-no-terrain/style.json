@@ -1,0 +1,316 @@
+{
+  "version": 8,
+  "zoom": 12,
+  "bearing": 0,
+  "center": [
+    11.52517,
+    47.34487
+  ],
+  "sources": {
+    "terrain": {
+      "type": "raster-dem",
+      "tiles": [
+        "local://tiles/terrain-shading/{z}-{x}-{y}.terrain.png"
+      ],
+      "maxzoom": 12,
+      "tileSize": 256
+    },
+    "osm": {
+      "type": "raster",
+      "tiles": [
+        "local://tiles/number/{z}.png"
+      ],
+      "maxzoom": 17,
+      "tileSize": 256
+    }
+  },
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "#ccddee"
+      }
+    },
+    {
+      "id": "osm",
+      "type": "raster",
+      "source": "osm"
+    },
+    {
+      "id": "hillshade",
+      "type": "hillshade",
+      "source": "terrain"
+    }
+  ],
+  "pitch": 60,
+  "metadata": {
+    "test": {
+      "width": 512,
+      "height": 512,
+      "maxPitch": 85,
+      "operations": [
+        [
+          "setPitch",
+          60
+        ],
+        [
+          "wait"
+        ],
+        [
+          "setBearing",
+          10
+        ],
+        [
+          "wait"
+        ],
+        [
+          "setBearing",
+          20
+        ],
+        [
+          "wait"
+        ],
+        [
+          "setBearing",
+          30
+        ],
+        [
+          "wait"
+        ],
+        [
+          "setBearing",
+          40
+        ],
+        [
+          "wait"
+        ],
+        [
+          "setBearing",
+          50
+        ],
+        [
+          "wait"
+        ],
+        [
+          "setBearing",
+          60
+        ],
+        [
+          "wait"
+        ],
+        [
+          "setBearing",
+          70
+        ],
+        [
+          "wait"
+        ],
+        [
+          "setBearing",
+          80
+        ],
+        [
+          "wait"
+        ],
+        [
+          "setBearing",
+          90
+        ],
+        [
+          "wait"
+        ],
+        [
+          "setBearing",
+          100
+        ],
+        [
+          "wait"
+        ],
+        [
+          "setBearing",
+          110
+        ],
+        [
+          "wait"
+        ],
+        [
+          "setBearing",
+          120
+        ],
+        [
+          "wait"
+        ],
+        [
+          "setBearing",
+          130
+        ],
+        [
+          "wait"
+        ],
+        [
+          "setBearing",
+          140
+        ],
+        [
+          "wait"
+        ],
+        [
+          "setBearing",
+          150
+        ],
+        [
+          "wait"
+        ],
+        [
+          "setBearing",
+          160
+        ],
+        [
+          "wait"
+        ],
+        [
+          "setBearing",
+          170
+        ],
+        [
+          "wait"
+        ],
+        [
+          "setBearing",
+          180
+        ],
+        [
+          "wait"
+        ],
+        [
+          "setBearing",
+          190
+        ],
+        [
+          "wait"
+        ],
+        [
+          "setBearing",
+          200
+        ],
+        [
+          "wait"
+        ],
+        [
+          "setBearing",
+          210
+        ],
+        [
+          "wait"
+        ],
+        [
+          "setBearing",
+          220
+        ],
+        [
+          "wait"
+        ],
+        [
+          "setBearing",
+          230
+        ],
+        [
+          "wait"
+        ],
+        [
+          "setBearing",
+          240
+        ],
+        [
+          "wait"
+        ],
+        [
+          "setBearing",
+          250
+        ],
+        [
+          "wait"
+        ],
+        [
+          "setBearing",
+          260
+        ],
+        [
+          "wait"
+        ],
+        [
+          "setBearing",
+          270
+        ],
+        [
+          "wait"
+        ],
+        [
+          "setBearing",
+          280
+        ],
+        [
+          "wait"
+        ],
+        [
+          "setBearing",
+          290
+        ],
+        [
+          "wait"
+        ],
+        [
+          "setBearing",
+          300
+        ],
+        [
+          "wait"
+        ],
+        [
+          "setBearing",
+          310
+        ],
+        [
+          "wait"
+        ],
+        [
+          "setBearing",
+          320
+        ],
+        [
+          "wait"
+        ],
+        [
+          "setBearing",
+          330
+        ],
+        [
+          "wait"
+        ],
+        [
+          "setBearing",
+          340
+        ],
+        [
+          "wait"
+        ],
+        [
+          "setBearing",
+          350
+        ],
+        [
+          "wait"
+        ],
+        [
+          "setBearing",
+          360
+        ],
+        [
+          "wait"
+        ]
+      ],
+      "description": "Tracy camera script tilt-60-turn-no-terrain: one frame per step"
+    }
+  }
+}

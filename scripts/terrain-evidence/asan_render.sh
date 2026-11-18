@@ -10,7 +10,7 @@ CCACHE_DISABLE=1 cmake --build "$B" --target mbgl-render-test-runner -j6 > "$OUT
 export ASAN_OPTIONS=detect_leaks=1:symbolize=1 UBSAN_OPTIONS=print_stacktrace=1
 for t in $(ls metrics/integration/render-tests/terrain); do
   [ -f "metrics/integration/render-tests/terrain/$t/style.json" ] || t="$t/$(ls metrics/integration/render-tests/terrain/$t | head -1)"
-  timeout 900 xvfb-run -a "./$B/mbgl-render-test-runner" --manifestPath=metrics/linux-opengl-terrain-gljs.json -f "terrain/$t\$" \
+  timeout 900 xvfb-run -a "./$B/mbgl-render-test-runner" --manifestPath=metrics/linux-opengl-terrain-gljs.json -f "terrain/$t/" \
     > "$OUT/render-${t//\//__}.log" 2>&1
   rc=$?
   printf '%-45s rc=%-4s asan=%s ubsan=%s leaks=%s\n' "$t" "$rc" \

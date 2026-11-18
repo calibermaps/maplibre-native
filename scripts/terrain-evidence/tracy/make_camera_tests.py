@@ -44,8 +44,16 @@ def pan_and_turn():
 
 SCRIPTS = {"tilt-60-turn": (60, turn(60)), "tilt-75-turn": (75, turn(75)), "pan-and-turn": (60, pan_and_turn())}
 
-for name, (pitch, ops) in SCRIPTS.items():
+def variants():
+    for name, (pitch, ops) in SCRIPTS.items():
+        yield name, pitch, ops, True
+        yield name + "-no-terrain", pitch, ops, False  # control: same path, no terrain
+
+
+for name, pitch, ops, with_terrain in variants():
     style = json.loads(json.dumps(BASE))
+    if not with_terrain:
+        style.pop("terrain")
     style["pitch"] = pitch
     style["metadata"] = {"test": {"width": 512, "height": 512, "maxPitch": 85, "operations": ops,
                                   "description": f"Tracy camera script {name}: one frame per step"}}
