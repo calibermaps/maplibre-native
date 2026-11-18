@@ -2,11 +2,13 @@
   "base_test_path": "integration",
   "cache_path": "cache-terrain-gljs.db",
   "expectation_paths": [
-      "expectations/platform-linux"
+    "expectations/platform-linux"
   ],
-  "ignore_paths": [],
+  "ignore_paths": [
+    "ignores/terrain-gljs-ports.json"
+  ],
   "metric_path": "linux-gcc8-release",
   "probes": [
-      "probeNetwork"
+    "probeNetwork"
   ]
 }

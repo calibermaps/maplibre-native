@@ -1,0 +1,15 @@
+{
+    "render-tests/terrain/fog": "needs sky and fog, not in native yet (https://github.com/maplibre/maplibre-native/issues/4414)",
+    "render-tests/terrain/fog-no-sky-blend": "needs sky and fog, not in native yet (https://github.com/maplibre/maplibre-native/issues/4414)",
+    "render-tests/terrain/fog-no-sky-blend-roll": "needs sky and fog, not in native yet (https://github.com/maplibre/maplibre-native/issues/4414)",
+    "render-tests/terrain/fog-sky-blend": "needs sky and fog, not in native yet (https://github.com/maplibre/maplibre-native/issues/4414)",
+    "render-tests/terrain/fog-sky-blend-roll": "needs sky and fog, not in native yet (https://github.com/maplibre/maplibre-native/issues/4414)",
+    "render-tests/terrain/fog-sky-blend-globe": "needs globe projection and sky, not in native",
+    "render-tests/terrain/symbol-height-anchor-absolute": "needs the symbol-height-anchor layout property, not in native",
+    "render-tests/terrain/symbol-height-anchor-ground": "needs the symbol-height-anchor layout property, not in native",
+    "render-tests/terrain/symbol-height-offset": "needs the symbol-height-offset layout property, not in native",
+    "render-tests/terrain/symbol-height-offset-building": "needs the symbol-height-offset layout property, not in native",
+    "render-tests/terrain/symbol-height-offset-occluded-ground": "needs the symbol-height-offset layout property, not in native",
+    "render-tests/terrain/symbol-add-terrain": "needs a setTerrain operation in the render test runner",
+    "render-tests/terrain/dem-cell-centre-hillshade-peak": "needs idle and setCenterClampedToGround operations in the render test runner (https://github.com/maplibre/maplibre-native/issues/4971)"
+}
