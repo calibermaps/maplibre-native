@@ -41,6 +41,11 @@ def main():
         for pattern, why in BLOCKED_PATHS:
             if pattern.search(path):
                 deny(f"Blocked read of {path}: {why}.")
+    elif tool.startswith("mcp__serena__"):
+        path = args.get("relative_path", "") or ""
+        for pattern, why in BLOCKED_PATHS:
+            if path and pattern.search(path.rstrip("/") + "/"):
+                deny(f"Blocked Serena lookup in {path}: {why}.")
     elif tool in ("Grep", "Glob"):
         path = args.get("path", "") or ""
         for pattern, why in BLOCKED_PATHS:

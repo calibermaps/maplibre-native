@@ -8,8 +8,8 @@ work branch `terrain-3d-phase0-evidence`, never on `main` or `feature/terrain-3d
 - Review and change only the files listed in `.claude/scope.txt` (the core diff of
   `feature/terrain-3d` against `main`: `src`, `include`, `shaders`; 321 files).
 - `TERRAIN.md` describes the architecture. Read the section for your slice, not the whole file.
-- Use the code index before reading files: the `clangd` MCP tools (definition, references,
-  symbol outline) or `ctags`/`ast-grep`. Read a function, not a 1,500-line file.
+- Use the code index before reading files: the Serena MCP tools (symbol outline, one
+  function's body, references) or `ast-grep`/`ctags`. Read a function, not a 1,500-line file.
 
 ## Do not read
 
@@ -61,16 +61,25 @@ Results and the gap list: `upstream-previews/terrain-3d-parity-tests.md` on the 
 
 ## Code index
 
-- `.mcp.json` starts `mcp-language-server` with the Mac's `clangd` (tools: definition,
-  references, hover, diagnostics, rename_symbol, edit_file). Paths in it are for the Intel Mac.
+- `.mcp.json` starts Serena 1.7.0 (clangd 19 underneath), read-only, with only its lookup
+  tools on: `get_symbols_overview` (use `depth: 1` for a class outline), `find_symbol`
+  (`name_path_pattern` like `RenderTerrain/updateElevationIndex`, `include_body: true` returns
+  just that function), `find_referencing_symbols`, `find_implementations`, `find_declaration`,
+  `get_diagnostics_for_file`. Always pass `relative_path` to narrow the search.
+  `.serena/project.yml` limits it to `src`, `include` (not `include/mln/shaders/gl`) and
+  `test/renderer`. Paths in `.mcp.json` are for the Intel Mac.
 - Make the compile database first: `scripts/terrain-evidence/export_compile_db.sh` copies the
-  container's Linux database and generated headers and rewrites paths to this checkout.
-  Metal, Vulkan and WebGPU files are not in it; use `ast-grep` or `ctags` for those.
-- `ast-grep` (`sg`), `lizard` and `jscpd` are installed on the Mac.
+  container's Linux database, generated headers and vendor headers, and rewrites paths to this
+  checkout. Then `serena project index .` once (about an hour on the Intel Mac).
+  Metal, Vulkan and WebGPU files are not in the database; use `ast-grep` for those.
+- `ast-grep` (`sg`), `lizard` and `jscpd` are installed on the Mac. Universal Ctags is in the
+  container only: `docker exec ml-build ctags ...`.
 
-Sanitizer (ASan + UBSan) and coverage (llvm-cov) builds: see
-`scripts/terrain-evidence/` (`asan.sh`, `coverage.sh`).
-Tracy camera scripts: `scripts/terrain-evidence/tracy/`.
+Sanitizer and coverage runs of the 20 terrain suites (about an hour each; the container
+needs `libclang-rt-18-dev`): `scripts/terrain-evidence/asan.sh` and `coverage.sh`.
+Tracy camera scripts (tilt 60, tilt 75, pan and turn): `scripts/terrain-evidence/tracy/run_tracy.sh`
+(pins Tracy v0.11.1; master no longer builds with `MLN_USE_TRACY`; needs `libdbus-1-dev`).
+Phase 0 output: `upstream-previews/terrain-3d-phase0-evidence/` on the host.
 
 ## Rules
 

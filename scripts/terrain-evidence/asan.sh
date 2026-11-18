@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ASan + UBSan build of mbgl-test-runner, then every terrain suite in its own process.
+# ASan + UBSan build (vptr check off: core builds without RTTI, so it only flags googletest) of mbgl-test-runner, then every terrain suite in its own process.
 # Run inside the ml-build container from the source tree root:
 #   scripts/terrain-evidence/asan.sh [build dir] [output dir]
 set -uo pipefail
@@ -7,8 +7,8 @@ B=${1:-build-asan}
 OUT=${2:-/work/p0-asan}
 mkdir -p "$OUT"
 CCACHE_DISABLE=1 cmake --preset linux-opengl -B "$B" -DCMAKE_BUILD_TYPE=Debug \
-  -DCMAKE_CXX_FLAGS_DEBUG="-O1 -g1 -fno-omit-frame-pointer -fsanitize=undefined" \
-  -DCMAKE_C_FLAGS_DEBUG="-O1 -g1 -fno-omit-frame-pointer -fsanitize=undefined" \
+  -DCMAKE_CXX_FLAGS_DEBUG="-O1 -g1 -fno-omit-frame-pointer -fsanitize=undefined -fno-sanitize=vptr" \
+  -DCMAKE_C_FLAGS_DEBUG="-O1 -g1 -fno-omit-frame-pointer -fsanitize=undefined -fno-sanitize=vptr" \
   -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=undefined" -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=undefined" \
   -DMLN_WITH_SANITIZER=address -DMLN_WITH_WERROR=OFF -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
   -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_C_COMPILER=clang > "$OUT/configure.log" 2>&1 || { tail -5 "$OUT/configure.log"; exit 1; }

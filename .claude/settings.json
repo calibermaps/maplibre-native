@@ -2,7 +2,7 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Read|Edit|Write|Grep|Glob|Bash",
+        "matcher": "Read|Edit|Write|Grep|Glob|Bash|mcp__serena__.*",
         "hooks": [
           {
             "type": "command",

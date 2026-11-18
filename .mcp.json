@@ -1,8 +1,9 @@
 {
   "mcpServers": {
-    "clangd": {
-      "command": "/Users/nick/.local/bin/mcp-language-server",
-      "args": ["--workspace", ".", "--lsp", "/usr/bin/clangd", "--", "--compile-commands-dir=.", "--background-index", "--header-insertion=never", "--log=error"]
+    "serena": {
+      "command": "/Users/nick/.local/bin/serena",
+      "args": ["start-mcp-server", "--project", ".", "--context", "claude-code",
+               "--enable-web-dashboard", "false", "--enable-gui-log-window", "false", "--log-level", "ERROR"]
     }
   }
 }
