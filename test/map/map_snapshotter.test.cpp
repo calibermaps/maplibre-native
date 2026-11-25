@@ -8,6 +8,9 @@
 #include <mln/util/run_loop.hpp>
 #include <mln/util/timer.hpp>
 #include <mln/util/io.hpp>
+#include <mln/util/image.hpp>
+
+#include <filesystem>
 
 using namespace mln;
 
@@ -173,4 +176,76 @@ TEST(MapSnapshotter, TEST_REQUIRES_SERVER(annotation)) {
     });
 
     runLoop.run();
+}
+
+namespace {
+
+// A flat plateau 2000 m high, as Terrain-RGB: (2000 + 10000) / 0.1 = 120000 = 1 * 65536 + 212 * 256 + 192.
+std::string plateauDEMURL() {
+    PremultipliedImage image({256, 256});
+    for (uint32_t i = 0; i < 256 * 256; ++i) {
+        image.data[i * 4 + 0] = 1;
+        image.data[i * 4 + 1] = 212;
+        image.data[i * 4 + 2] = 192;
+        image.data[i * 4 + 3] = 255;
+    }
+    const auto path = std::filesystem::temp_directory_path() / "mln-snapshotter-terrain-plateau.png";
+    util::write_file(path.string(), encodePNG(image));
+    return "file://" + path.string();
+}
+
+struct SnapshotProjection {
+    ScreenCoordinate point;
+    LatLng roundTrip;
+};
+
+// Where a snapshot's conversion functions put `latLng`, and the coordinate they give back for that pixel.
+SnapshotProjection snapshotProjection(bool terrain, const LatLng& latLng) {
+    util::RunLoop runLoop;
+    MapSnapshotter snapshotter(Size{256, 256}, 1.0f, ResourceOptions());
+    std::string style = R"JSON({
+        "version": 8,
+        "sources": {"dem": {"type": "raster-dem", "tiles": ["DEM_URL"], "encoding": "mapbox",
+                            "minzoom": 0, "maxzoom": 0, "tileSize": 256}},
+        "layers": [{"id": "background", "type": "background", "paint": {"background-color": "green"}}]
+    })JSON";
+    if (terrain) {
+        style.replace(style.rfind('}'), 1, R"JSON(, "terrain": {"source": "dem", "exaggeration": 1.0}})JSON");
+    }
+    style.replace(style.find("DEM_URL"), 7, plateauDEMURL());
+    snapshotter.setStyleJSON(style);
+    snapshotter.setCameraOptions(CameraOptions().withCenter(LatLng{46.0, 10.0}).withZoom(8.0).withPitch(60.0));
+
+    SnapshotProjection result;
+    snapshotter.snapshot([&](std::exception_ptr error,
+                             PremultipliedImage,
+                             MapSnapshotter::Attributions,
+                             MapSnapshotter::PointForFn pointFor,
+                             MapSnapshotter::LatLngForFn latLngFor) {
+        EXPECT_EQ(nullptr, error);
+        result.point = pointFor(latLng);
+        result.roundTrip = latLngFor(result.point);
+        runLoop.stop();
+    });
+    runLoop.run();
+    return result;
+}
+
+} // namespace
+
+// With terrain a snapshot's conversions answer on the draped surface, as the map's projection does
+// (Map::pixelForLatLngOnTerrain): a point on a 2000 m plateau seen from a pitched camera sits
+// higher on the screen than the same point at sea level, and converting that pixel back gives the
+// point. They used to ignore the terrain, so a marker placed with them landed below the ground it marks.
+TEST(MapSnapshotter, ConversionsAnswerOnTheTerrainSurface) {
+    const LatLng ahead{46.5, 10.0};
+    const auto flat = snapshotProjection(false, ahead);
+    const auto draped = snapshotProjection(true, ahead);
+
+    EXPECT_LT(draped.point.y, flat.point.y - 3.0) << "sea level y " << flat.point.y << ", terrain y " << draped.point.y;
+    EXPECT_NEAR(draped.point.x, flat.point.x, 1.0);
+    EXPECT_NEAR(draped.roundTrip.latitude(), ahead.latitude(), 0.01);
+    EXPECT_NEAR(draped.roundTrip.longitude(), ahead.longitude(), 0.01);
+    // Without terrain nothing changes: the sea-level round trip.
+    EXPECT_NEAR(flat.roundTrip.latitude(), ahead.latitude(), 0.01);
 }

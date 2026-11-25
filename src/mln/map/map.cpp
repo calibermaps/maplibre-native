@@ -490,6 +490,10 @@ std::optional<double> Map::getTerrainElevation(const LatLng& latLng) const {
     return impl->terrainElevationIndex->getElevation(latLng);
 }
 
+std::shared_ptr<const TerrainElevationIndex> Map::getTerrainElevationIndex() const {
+    return impl->terrainElevationIndex;
+}
+
 ScreenCoordinate Map::pixelForLatLngOnTerrain(const LatLng& latLng) const {
     // Look the height up at the longitude pixelForLatLng projects, unwrapped for the shortest path
     // to the centre: near the antimeridian the drawn DEM tiles have wrap != 0, and the index keys
