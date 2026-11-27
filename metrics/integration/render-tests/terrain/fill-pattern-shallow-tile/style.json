@@ -1,0 +1,87 @@
+{
+  "version": 8,
+  "metadata": {
+    "test": {
+      "width": 256,
+      "height": 256,
+      "description": "A fill-pattern polygon from a GeoJSON source that stops at zoom 8, drawn over 3D terrain at zoom 14 seen from straight above: its tile is six zooms shallower than the drape targets, so the vertex shader has to place the pattern into each target from the tile's own position. Only the west half of the view is patterned.",
+      "centerClampedToGround": true,
+      "allowed": 0.005
+    }
+  },
+  "center": [
+    11.43402,
+    47.36645
+  ],
+  "zoom": 14,
+  "pitch": 0,
+  "bearing": 0,
+  "sprite": "local://sprites/emerald",
+  "sources": {
+    "terrain": {
+      "type": "raster-dem",
+      "tiles": [
+        "local://tiles/terrain-shading/{z}-{x}-{y}.terrain.png"
+      ],
+      "maxzoom": 12,
+      "tileSize": 256
+    },
+    "west": {
+      "type": "geojson",
+      "maxzoom": 8,
+      "data": {
+        "type": "Feature",
+        "properties": {},
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [
+                11.4,
+                47.34
+              ],
+              [
+                11.43402,
+                47.34
+              ],
+              [
+                11.43402,
+                47.4
+              ],
+              [
+                11.4,
+                47.4
+              ],
+              [
+                11.4,
+                47.34
+              ]
+            ]
+          ]
+        }
+      }
+    }
+  },
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "white"
+      }
+    },
+    {
+      "id": "west",
+      "type": "fill",
+      "source": "west",
+      "paint": {
+        "fill-pattern": "generic_icon",
+        "fill-antialias": false
+      }
+    }
+  ],
+  "terrain": {
+    "source": "terrain",
+    "exaggeration": 1
+  }
+}
