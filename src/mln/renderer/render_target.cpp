@@ -133,7 +133,13 @@ std::size_t RenderTarget::drapedDataID(const gfx::Drawable& drawable) {
         return 0;
     }
     const auto& bucket = drawable.getBucket();
-    return bucket ? static_cast<std::size_t>(bucket->getID().id()) : 0;
+    std::size_t id = bucket ? static_cast<std::size_t>(bucket->getID().id()) : 0;
+    // An image drawable has no bucket of its own to tell new data apart: the source reuses one
+    // bucket and swaps its image, so the drawable carries the bucket's revision.
+    if (const auto& data = drawable.getData()) {
+        util::hash_combine(id, data->contentRevision());
+    }
+    return id;
 }
 
 RenderTarget::DrapeCoverage RenderTarget::computeDrapeCoverage(RenderOrchestrator& orchestrator,

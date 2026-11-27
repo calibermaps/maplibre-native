@@ -83,6 +83,11 @@ public:
 
     const util::SimpleIdentity& getID() const { return bucketID; }
 
+    /// Changes whenever what the bucket draws changes while its ID stays: an image source keeps one
+    /// bucket and swaps its image or corners. A terrain drape folds it in to bake the bucket again.
+    std::uint32_t getContentRevision() const { return contentRevision; }
+    void markContentChanged() { ++contentRevision; }
+
 #if MLN_SYMBOL_GUARDS
     virtual bool check(source_location) { return true; }
 #else
@@ -107,6 +112,7 @@ protected:
     std::atomic<bool> uploaded{false};
 
     util::SimpleIdentity bucketID;
+    std::uint32_t contentRevision = 0;
 
     std::optional<std::thread::id> renderThreadID;
 

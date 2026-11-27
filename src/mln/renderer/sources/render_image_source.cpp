@@ -174,10 +174,16 @@ void RenderImageSource::update(Immutable<style::Source::Impl> baseImpl_,
         bucket = std::make_shared<RasterBucket>(image);
     } else {
         bucket->clear();
+        // The bucket keeps its ID when only the corners move, so say that what it draws changed.
+        if (geomCoords != lastGeometry) {
+            bucket->markContentChanged();
+        }
         if (image != bucket->image) {
             bucket->setImage(image);
         }
     }
+
+    lastGeometry = geomCoords;
 
     // Set Bucket Vertices, Indices, and segments
     bucket->vertices.emplace_back(RasterBucket::layoutVertex({geomCoords[0].x, geomCoords[0].y}, {0, 0}));

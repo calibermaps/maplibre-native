@@ -58,6 +58,7 @@ void RasterBucket::setImage(std::shared_ptr<PremultipliedImage> image_) {
     heldImageBytes += imageBytes(image);
     texture2d.reset();
     uploaded = false;
+    ++contentRevision;
 }
 
 void RasterBucket::releaseImage() {
