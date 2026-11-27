@@ -3,7 +3,6 @@
 #include <mln/test/util.hpp>
 
 #include <algorithm>
-#include <functional>
 #include <optional>
 #include <vector>
 
@@ -113,11 +112,11 @@ TEST(GridIndex, EveryCollidingBoxIsReportedOnce) {
         std::sort(actual.begin(), actual.end());
         EXPECT_EQ(expected, actual) << "query " << i;
 
-        const std::optional<std::function<bool(const uint32_t&)>> odd = [](const uint32_t& id) {
+        const auto odd = [](const uint32_t& id) {
             return id % 2 == 1;
         };
-        const bool expectedOdd = std::any_of(expected.begin(), expected.end(), [](uint32_t id) { return id % 2 == 1; });
-        EXPECT_EQ(expectedOdd, grid.hitTest(query, odd)) << "query " << i;
+        EXPECT_EQ(std::any_of(expected.begin(), expected.end(), odd), grid.hitTest(query, std::optional{odd}))
+            << "query " << i;
         EXPECT_EQ(!expected.empty(), grid.hitTest(query)) << "query " << i;
     }
 }
@@ -130,11 +129,11 @@ TEST(GridIndex, CoveringCircleTestsEveryElementOnce) {
     grid.insert(2u, Circle{{50, 50}, 10});
 
     std::vector<uint32_t> tested;
-    const std::optional<std::function<bool(const uint32_t&)>> record = [&](const uint32_t& id) {
+    const auto record = [&](const uint32_t& id) {
         tested.push_back(id);
         return false;
     };
-    EXPECT_FALSE(grid.hitTest(Circle{{50, 50}, 500}, record));
+    EXPECT_FALSE(grid.hitTest(Circle{{50, 50}, 500}, std::optional{record}));
     std::sort(tested.begin(), tested.end());
     EXPECT_EQ((std::vector<uint32_t>{0, 1, 2}), tested);
 }
@@ -147,11 +146,11 @@ TEST(GridIndex, CircleTestsEveryCollidingElementOnce) {
     grid.insert(2u, Box{{90, 90}, {95, 95}});
 
     std::vector<uint32_t> tested;
-    const std::optional<std::function<bool(const uint32_t&)>> record = [&](const uint32_t& id) {
+    const auto record = [&](const uint32_t& id) {
         tested.push_back(id);
         return false;
     };
-    EXPECT_FALSE(grid.hitTest(Circle{{40, 40}, 22}, record));
+    EXPECT_FALSE(grid.hitTest(Circle{{40, 40}, 22}, std::optional{record}));
     std::sort(tested.begin(), tested.end());
     EXPECT_EQ((std::vector<uint32_t>{0, 1}), tested);
 }
