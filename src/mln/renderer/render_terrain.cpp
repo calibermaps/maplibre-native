@@ -514,6 +514,30 @@ std::set<UnwrappedTileID> RenderTerrain::coarsenFarMeshTiles(std::set<UnwrappedT
     };
     std::unordered_map<UnwrappedTileID, Count> counts;
 
+    // The zoom the cover asked for in each tile: its own, and for a tile merged from children the
+    // deepest of theirs. While the cover holds tiles at or below minZoom, which cannot merge, a
+    // parent may take its children's place only within maxCoarseningLevels of that zoom; past it
+    // the cap drops the farthest tiles instead. Those are the ones that cannot merge, the far
+    // ground a wide view pulls in, where a tile covers least of the screen.
+    std::unordered_map<UnwrappedTileID, uint8_t> asked;
+    for (const auto& id : tiles) {
+        asked.emplace(id, id.canonical.z);
+    }
+    const bool limited = std::ranges::any_of(tiles,
+                                             [&](const UnwrappedTileID& id) { return id.canonical.z <= minZoom; });
+    const auto withinLimit = [&](const UnwrappedTileID& parent) {
+        if (!limited) {
+            return true;
+        }
+        uint8_t deepest = parent.canonical.z;
+        for (const auto& child : parent.children()) {
+            if (const auto found = asked.find(child); found != asked.end() && tiles.contains(child)) {
+                deepest = std::max(deepest, found->second);
+            }
+        }
+        return deepest <= parent.canonical.z + maxCoarseningLevels;
+    };
+
     // The parents ready to merge, farthest first. Ties go by tile ID, as in nearestMeshTiles.
     struct Candidate {
         double dist2;
@@ -534,7 +558,7 @@ std::set<UnwrappedTileID> RenderTerrain::coarsenFarMeshTiles(std::set<UnwrappedT
     };
     const auto refresh = [&](const UnwrappedTileID& id, Count& count) {
         const bool isReady = count.children > 0 && count.deeper == 0 &&
-                             (id.canonical.z >= originMinZoom || !holdsOrigin(id));
+                             (id.canonical.z >= originMinZoom || !holdsOrigin(id)) && withinLimit(id);
         if (isReady == count.queued) {
             return;
         }
@@ -574,7 +598,11 @@ std::set<UnwrappedTileID> RenderTerrain::coarsenFarMeshTiles(std::set<UnwrappedT
     // latest.
     while (tiles.size() > maxTiles && !ready.empty()) {
         const UnwrappedTileID farthest = ready.begin()->id;
+        uint8_t& farthestAsked = asked.try_emplace(farthest, farthest.canonical.z).first->second;
         for (const auto& child : farthest.children()) {
+            if (const auto found = asked.find(child); found != asked.end() && tiles.contains(child)) {
+                farthestAsked = std::max(farthestAsked, found->second);
+            }
             if (tiles.erase(child) > 0) {
                 account(child, -1, true);
             }

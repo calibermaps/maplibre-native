@@ -168,13 +168,24 @@ public:
                                                       size_t maxTiles,
                                                       const std::array<double, 2>& origin);
 
+    /// How much shallower than the zoom it was given coarsenFarMeshTiles may make a tile while far
+    /// tiles that cannot merge are left to drop: two levels, a drape four times coarser than the
+    /// view asked for. A camera on the ground with a wide field of view (a photo preview at a
+    /// person's eye) has a cover of over a hundred tiles; merging without a limit took the ground
+    /// in front of the camera from zoom 20 to the DEM's zoom 13, one drape texel over meters of
+    /// the slope there, to keep tiles thousands of kilometers away.
+    static constexpr uint8_t maxCoarseningLevels = 2;
+
     /// While there are more than `maxTiles` tiles (0: no limit), the group of sibling tiles
     /// farthest from `origin` gives way to its parent, never shallower than `minZoom`. Only
     /// siblings with nothing deeper inside merge, so detail goes first in the distance, where a
     /// tile covers little of the screen, and the tiles still cover all the ground they did.
-    /// Whatever is still over `maxTiles` once no tile is deeper than `minZoom`, nearestMeshTiles
-    /// drops. The tile holding `origin` never gives way to a parent shallower than
-    /// `originMinZoom` (meshZoomForEveryDEMPixel).
+    /// Whatever is still over `maxTiles`, nearestMeshTiles drops. The tile holding `origin` never
+    /// gives way to a parent shallower than `originMinZoom` (meshZoomForEveryDEMPixel). When the
+    /// cover also holds tiles at or below `minZoom`, which cannot merge, no tile goes more than
+    /// `maxCoarseningLevels` shallower than the zoom it was given: those tiles lie beyond the
+    /// deeper ones, so merging on would only blur the ground nearest the camera to keep far ground
+    /// that covers little of the screen.
     static std::set<UnwrappedTileID> coarsenFarMeshTiles(std::set<UnwrappedTileID> tiles,
                                                          size_t maxTiles,
                                                          uint8_t minZoom,

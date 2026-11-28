@@ -469,6 +469,37 @@ TEST(TerrainMeshCover, TheMeshHasAVertexForEveryDEMPixelOneOrTwoLevelsPastTheDEM
     EXPECT_EQ(14, RenderTerrain::meshZoomForEveryDEMPixel(13, 512, 14));
 }
 
+TEST(TerrainMeshCover, CoarseningKeepsTheNearGroundWithinTwoLevelsWhileFarTilesCannotMerge) {
+    // A level-of-detail cover seen from the north-west corner: z5 at the corner, then rings of z4
+    // and z3, and beyond them tiles at the minimum zoom (z2) and under it (z1), which cannot
+    // merge. Down to 8 tiles, merging on would take the corner to z2, three levels under the z5 it
+    // was given, to keep the far tiles. It stops at z3, two levels, and leaves the rest over the
+    // cap for nearestMeshTiles to drop: the farthest, the z1 tiles.
+    std::set<UnwrappedTileID> original{tile(5, 0, 0), tile(5, 1, 0), tile(5, 0, 1), tile(5, 1, 1)};
+    for (const uint8_t z : {4, 3, 2, 1}) {
+        original.insert({tile(z, 1, 0), tile(z, 0, 1), tile(z, 1, 1)});
+    }
+    const auto coarse = RenderTerrain::coarsenFarMeshTiles(original, 8, 2, northWestCorner);
+    EXPECT_TRUE(coversAll(coarse, original));
+    EXPECT_TRUE(coarse.contains(tile(3, 0, 0))) << "the corner merges two levels, to z3";
+    EXPECT_FALSE(coarse.contains(tile(2, 0, 0))) << "and no further";
+    EXPECT_EQ(10u, coarse.size());
+    const auto capped = RenderTerrain::nearestMeshTiles(coarse, 8, northWestCorner);
+    EXPECT_TRUE(capped.contains(tile(3, 0, 0)));
+    EXPECT_FALSE(capped.contains(tile(1, 1, 1))) << "the cap drops the far tiles instead";
+}
+
+TEST(TerrainMeshCover, CoarseningWithoutTilesThatCannotMergeHasNoLevelLimit) {
+    // The same cover without the tiles at and under the minimum zoom: nothing is left to drop
+    // that would spare the near ground, so the corner merges as far as the cap needs (z2).
+    std::set<UnwrappedTileID> original{tile(5, 0, 0), tile(5, 1, 0), tile(5, 0, 1), tile(5, 1, 1)};
+    for (const uint8_t z : {4, 3}) {
+        original.insert({tile(z, 1, 0), tile(z, 0, 1), tile(z, 1, 1)});
+    }
+    const auto coarse = RenderTerrain::coarsenFarMeshTiles(original, 1, 2, northWestCorner);
+    EXPECT_EQ((std::set<UnwrappedTileID>{tile(2, 0, 0)}), coarse);
+}
+
 namespace {
 // Where the DEM mapping puts a tile-local position, in the DEM tile's normalized coordinates.
 std::array<float, 2> inDEM(const std::array<float, 3>& mapping, float x, float y) {
