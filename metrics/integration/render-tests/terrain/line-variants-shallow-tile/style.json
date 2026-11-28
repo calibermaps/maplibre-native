@@ -1,0 +1,199 @@
+{
+  "version": 8,
+  "metadata": {
+    "test": {
+      "width": 256,
+      "height": 256,
+      "description": "Four lines from GeoJSON tiles that stop at zoom 8, drawn over 3D terrain at zoom 14 seen from straight above: plain, gradient, dashed, and dashed with a gradient. Lines drawn into a terrain drape target must keep sharp edges and sit where their tile puts them; the plain line is the reference for the other three. Pattern lines are left out: they draw differently on OpenGL and Vulkan even without terrain.",
+      "centerClampedToGround": true,
+      "allowed": 0.01
+    }
+  },
+  "center": [
+    11.43402,
+    47.36645
+  ],
+  "zoom": 14,
+  "pitch": 0,
+  "bearing": 0,
+  "sprite": "local://sprites/emerald",
+  "sources": {
+    "terrain": {
+      "type": "raster-dem",
+      "tiles": [
+        "local://tiles/terrain-shading/{z}-{x}-{y}.terrain.png"
+      ],
+      "maxzoom": 12,
+      "tileSize": 256
+    },
+    "l0": {
+      "type": "geojson",
+      "maxzoom": 8,
+      "lineMetrics": true,
+      "data": {
+        "type": "Feature",
+        "properties": {},
+        "geometry": {
+          "type": "LineString",
+          "coordinates": [
+            [
+              11.43042,
+              47.34
+            ],
+            [
+              11.43042,
+              47.4
+            ]
+          ]
+        }
+      }
+    },
+    "l1": {
+      "type": "geojson",
+      "maxzoom": 8,
+      "lineMetrics": true,
+      "data": {
+        "type": "Feature",
+        "properties": {},
+        "geometry": {
+          "type": "LineString",
+          "coordinates": [
+            [
+              11.43222,
+              47.34
+            ],
+            [
+              11.43222,
+              47.4
+            ]
+          ]
+        }
+      }
+    },
+    "l2": {
+      "type": "geojson",
+      "maxzoom": 8,
+      "lineMetrics": true,
+      "data": {
+        "type": "Feature",
+        "properties": {},
+        "geometry": {
+          "type": "LineString",
+          "coordinates": [
+            [
+              11.43402,
+              47.34
+            ],
+            [
+              11.43402,
+              47.4
+            ]
+          ]
+        }
+      }
+    },
+    "l4": {
+      "type": "geojson",
+      "maxzoom": 8,
+      "lineMetrics": true,
+      "data": {
+        "type": "Feature",
+        "properties": {},
+        "geometry": {
+          "type": "LineString",
+          "coordinates": [
+            [
+              11.43762,
+              47.34
+            ],
+            [
+              11.43762,
+              47.4
+            ]
+          ]
+        }
+      }
+    }
+  },
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "white"
+      }
+    },
+    {
+      "id": "l0",
+      "type": "line",
+      "source": "l0",
+      "paint": {
+        "line-width": 12,
+        "line-color": "red"
+      }
+    },
+    {
+      "id": "l1",
+      "type": "line",
+      "source": "l1",
+      "paint": {
+        "line-width": 12,
+        "line-gradient": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "line-progress"
+          ],
+          0,
+          "red",
+          1,
+          "blue"
+        ]
+      }
+    },
+    {
+      "id": "l2",
+      "type": "line",
+      "source": "l2",
+      "paint": {
+        "line-width": 12,
+        "line-color": "green",
+        "line-dasharray": [
+          30,
+          20
+        ]
+      }
+    },
+    {
+      "id": "l4",
+      "type": "line",
+      "source": "l4",
+      "paint": {
+        "line-width": 12,
+        "line-dasharray": [
+          30,
+          20
+        ],
+        "line-gradient": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "line-progress"
+          ],
+          0,
+          "red",
+          1,
+          "blue"
+        ]
+      }
+    }
+  ],
+  "terrain": {
+    "source": "terrain",
+    "exaggeration": 1
+  }
+}
