@@ -4,6 +4,7 @@
 #include <mln/renderer/render_tile.hpp>
 #include <mln/renderer/render_tree.hpp>
 #include <mln/style/sources/image_source_impl.hpp>
+#include <mln/util/geometry.hpp>
 
 namespace mln {
 
@@ -75,6 +76,8 @@ private:
     std::shared_ptr<RasterBucket> bucket;
     std::unique_ptr<ImageSourceRenderData> renderData;
     std::vector<UnwrappedTileID> tileIds;
+    /// The corners the bucket was last filled with, in the first tile's coordinates.
+    GeometryCoordinates lastGeometry;
     std::vector<UnwrappedTileID> cover;
 };
 

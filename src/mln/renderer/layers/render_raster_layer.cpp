@@ -279,7 +279,7 @@ void RenderRasterLayer::update(gfx::ShaderRegistry& shaders,
 
                 for (auto& drawable : builder->clearDrawables()) {
                     drawable->setTileID(tileID);
-                    drawable->setData(std::make_unique<gfx::ImageDrawableData>(cover));
+                    drawable->setData(std::make_unique<gfx::ImageDrawableData>(cover, bucket.getContentRevision()));
                     drawable->setLayerTweaker(layerTweaker);
                     imageLayerGroup->addDrawable(renderPass, tileID, std::move(drawable));
                     ++stats.drawablesAdded;
