@@ -27,6 +27,7 @@
 namespace mln {
 
 class RendererFrontend;
+class TerrainElevationIndex;
 class TransformState;
 
 namespace style {
@@ -150,6 +151,9 @@ public:
     LatLng latLngForPixelOnTerrain(const ScreenCoordinate&) const;
     std::vector<ScreenCoordinate> pixelsForLatLngsOnTerrain(const std::vector<LatLng>&) const;
     std::vector<LatLng> latLngsForPixelsOnTerrain(const std::vector<ScreenCoordinate>&) const;
+    /// The map's copy of the terrain heights, or null without terrain. It never changes, so it can
+    /// answer terrain projections off the map's thread, as a snapshot's conversion functions do.
+    std::shared_ptr<const TerrainElevationIndex> getTerrainElevationIndex() const;
 
     // Transform
     TransformState getTransformState() const;

@@ -7,6 +7,7 @@
 #include <mln/map/transform_state.hpp>
 #include <mln/map/transform.hpp>
 #include <mln/renderer/renderer_observer.hpp>
+#include <mln/renderer/terrain_elevation_index.hpp>
 #include <mln/renderer/update_parameters.hpp>
 #include <mln/storage/resource_options.hpp>
 #include <mln/style/style.hpp>
@@ -79,6 +80,11 @@ public:
     }
 
     void onInvalidate() override { rendererObserver->onInvalidate(); }
+
+    // Without this the heights never reach the map: the default does nothing.
+    void onTerrainElevationIndexChanged(std::shared_ptr<const TerrainElevationIndex> index) override {
+        rendererObserver->onTerrainElevationIndexChanged(std::move(index));
+    }
 
     void onResourceError(std::exception_ptr err) override {
         hasPendingStillImageRequest = false;
@@ -256,19 +262,38 @@ public:
             // and can be used to translate for geographic to screen
             // coordinates
             assert(map.getCameraOptions().center);
+            // With terrain they answer on the draped surface, as Map::pixelForLatLngOnTerrain and
+            // Map::latLngForPixelOnTerrain do, from the heights the map holds now: the index never
+            // changes, so the functions stay valid when the snapshotter is gone.
             PointForFn pointForFn = [center = *map.getCameraOptions().center,
-                                     transformState = frontend.getTransformState()](const LatLng& latLng) {
+                                     transformState = frontend.getTransformState(),
+                                     elevation = map.getTerrainElevationIndex()](const LatLng& latLng) {
                 LatLng unwrappedLatLng = latLng.wrapped();
                 unwrappedLatLng.unwrapForShortestPath(center);
                 Transform transform{transformState};
+                if (elevation) {
+                    if (const auto height = elevation->getElevation(unwrappedLatLng)) {
+                        return transform.latLngToScreenCoordinate(unwrappedLatLng, *height);
+                    }
+                }
                 return transform.latLngToScreenCoordinate(unwrappedLatLng);
             };
 
             // Create lambda that captures the current transform state
-            // and can be used to translate for geographic to screen
+            // and can be used to translate for screen to geographic
             // coordinates
             LatLngForFn latLngForFn =
-                [transformState = frontend.getTransformState()](const ScreenCoordinate& screenCoordinate) {
+                [transformState = frontend.getTransformState(),
+                 elevation = map.getTerrainElevationIndex()](const ScreenCoordinate& screenCoordinate) {
+                    if (elevation) {
+                        if (const auto surface = pickTerrainSurface(
+                                transformState,
+                                screenCoordinate,
+                                [&](const LatLng& latLng) { return elevation->getElevation(latLng); },
+                                elevation->getMaxElevation())) {
+                            return *surface;
+                        }
+                    }
                     Transform transform{transformState};
                     return transform.screenCoordinateToLatLng(screenCoordinate);
                 };
